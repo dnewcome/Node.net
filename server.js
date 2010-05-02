@@ -12,12 +12,14 @@ class HttpServer
 {
 	var httpListener : HttpListener;
 	var prefix;
+	var requestCallback;
 	var autoResetEvent : AutoResetEvent = new AutoResetEvent( false );
 
-	function HttpServer( prefix ) {
+	function HttpServer( requestCallback, prefix ) {
 		var httpListener : HttpListener = new HttpListener();
 		this.httpListener = httpListener;
 		this.prefix = prefix;
+		this.requestCallback = requestCallback;
 		httpListener.Prefixes.Add( prefix );
 		// return this;
 	}
@@ -30,25 +32,22 @@ class HttpServer
 			autoResetEvent.WaitOne();
 		}
 	}
+	
 	function ListenerCallback( result : IAsyncResult ) {
 		print( 'ListenerCallback():' );
 		autoResetEvent.Set();
+
 		var listener : HttpListener = HttpListener( result.AsyncState );
 		var context : HttpListenerContext = listener.EndGetContext( result );
 		var request : HttpListenerRequest = context.Request;
 		var response : HttpListenerResponse = context.Response;
-		var responseString : String = "<HTML><BODY> Hello world!</BODY></HTML>";
-		var buffer : byte[] = System.Text.Encoding.UTF8.GetBytes( responseString );
-		response.ContentLength64 = buffer.Length;
-		var output : Stream = response.OutputStream;
-		output.Write( buffer,0,buffer.Length );
-		output.Close();
+		this.requestCallback( request, response );
 	}
 
 } // class
 
 http.createServer = function( callback, prefix ) {
-	return new HttpServer( prefix );
+	return new HttpServer( callback, prefix );
 }
 
 // takes a .js file on the commandline, eval it 
