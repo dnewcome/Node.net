@@ -12,6 +12,7 @@ class HttpServer
 {
 	var httpListener : HttpListener;
 	var prefix;
+	var autoResetEvent : AutoResetEvent = new AutoResetEvent( false );
 
 	function HttpServer( prefix ) {
 		var httpListener : HttpListener = new HttpListener();
@@ -24,14 +25,14 @@ class HttpServer
 	function listen() {
 		print( 'HttpServer.listen():' );
 		this.httpListener.Start();
-		print( 'listener started successfully' );
-		print( 'httpListener: ' + this.httpListener );
-		var result : IAsyncResult = this.httpListener.BeginGetContext( ListenerCallback, httpListener );
-		print( 'BeginGetContext called successfully' );
-		Thread.Sleep( Timeout.Infinite );
+		while( true ) {
+			var result : IAsyncResult = this.httpListener.BeginGetContext( ListenerCallback, httpListener );
+			autoResetEvent.WaitOne();
+		}
 	}
 	function ListenerCallback( result : IAsyncResult ) {
 		print( 'ListenerCallback():' );
+		autoResetEvent.Set();
 		var listener : HttpListener = HttpListener( result.AsyncState );
 		var context : HttpListenerContext = listener.EndGetContext( result );
 		var request : HttpListenerRequest = context.Request;
