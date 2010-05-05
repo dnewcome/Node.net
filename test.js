@@ -9,4 +9,4 @@ function cb( request, response ) {
 		output.Close();
 }
 
-var server = http.createServer( cb, 'http://localhost:9980/' ).listen();
+var server = http.createServer( cb ).listen( 9980, 'localhost' );

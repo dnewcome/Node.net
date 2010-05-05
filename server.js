@@ -15,17 +15,16 @@ class HttpServer
 	var requestCallback;
 	var autoResetEvent : AutoResetEvent = new AutoResetEvent( false );
 
-	function HttpServer( requestCallback, prefix ) {
+	function HttpServer( requestCallback ) {
 		var httpListener : HttpListener = new HttpListener();
 		this.httpListener = httpListener;
-		this.prefix = prefix;
 		this.requestCallback = requestCallback;
-		httpListener.Prefixes.Add( prefix );
-		// return this;
 	}
 
-	function listen() {
+	function listen( port, host ) {
 		print( 'HttpServer.listen():' );
+		var prefix = 'http://' + host + ':' + port + '/';
+		this.httpListener.Prefixes.Add( prefix );
 		this.httpListener.Start();
 		while( true ) {
 			var result : IAsyncResult = this.httpListener.BeginGetContext( ListenerCallback, httpListener );
@@ -46,8 +45,8 @@ class HttpServer
 
 } // class
 
-http.createServer = function( callback, prefix ) {
-	return new HttpServer( callback, prefix );
+http.createServer = function( callback ) {
+	return new HttpServer( callback );
 }
 
 // takes a .js file on the commandline, eval it 
