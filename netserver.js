@@ -36,6 +36,7 @@ class NetServer
 		print( 'net.Server.listen(): starting tcp server' );
 		this.tcpServer.Start();
 		this.tcpServer.BeginAcceptTcpClient( listenerCallback, null );
+		queueWorkItem( { callback: raiseListeningEvent, args: [] } );
 	}
 	
 	function listenerCallback( result : IAsyncResult ) {
@@ -48,6 +49,7 @@ class NetServer
 	
 	// TODO: pull this stuff out to an event class
 	function raiseListeningEvent() {
+		print( 'http.server.raiseListeningEvent()' );
 		for( var i=0; i < listeningCallbacks.length; i++ ) {
 			listeningCallbacks[i]();
 		}
