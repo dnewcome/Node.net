@@ -8,11 +8,29 @@ class HttpServer
 {
 	var httpListener : HttpListener;
 	var prefix;
+	var requestCallbacks = [];
 	var requestCallback;
-
+	
+	function raiseRequestEvent( req, res ) {
+		print( 'http.server.raiseRequestEvent()' );
+		for( var i=0; i < requestCallbacks.length; i++ ) {
+			requestCallbacks[i]( req, res );
+		}
+	}
+	
+	function addListener( eventname, callback) {
+		if( eventname == 'request' ) {
+			requestCallbacks.push( callback );
+		}
+		else {
+			throw "addListener called for unsupported event";
+		}
+	}
+	
 	function HttpServer( requestCallback ) {
 		var httpListener : HttpListener = new HttpListener();
 		this.httpListener = httpListener;
+		// this.addListener( 'request', requestCallback );
 		this.requestCallback = requestCallback;
 	}
 
@@ -35,7 +53,7 @@ class HttpServer
 		var request : HttpListenerRequest = context.Request;
 		var response : HttpListenerResponse = context.Response;
 		
-		// var httpServerRequest = new HttpServerRequest( request );
+		var httpServerRequest = new HttpServerRequest( request );
 		var httpServerResponse = new HttpServerResponse( response );
 		queueWorkItem( { callback: requestCallback, args: [ request, httpServerResponse ] } );
 	}
@@ -48,6 +66,16 @@ class HttpServerRequest
 {
 	var dataCallbacks = [];
 	var endCallbacks = [];
+	
+	function HttpServerRequest( request : HttpListenerRequest ) {
+		
+	}
+	
+	function raiseDataEvent() {
+		for( var i=0; i < dataCallbacks.length; i++ ) {
+			dataCallbacks[i]();
+		}
+	}
 	
 	function addListener( eventname, callback) {
 		if( eventname == 'data' ) {
@@ -97,6 +125,6 @@ class HttpServerResponse
 class http {
 	static function createServer( callback ) {
 		return new HttpServer( callback );
-}
+	}
 }
 } // package

@@ -8,11 +8,15 @@ import System.Net;
 import System.Net.Sockets;
 import System.IO;
 
-var net = {};
+package Net 
+{
 
-net.createServer = function( callback ) {
-	return new NetServer( callback );
-};
+class net 
+{
+	static function createServer( callback ) {
+		return new NetServer( callback );
+	}
+}
 
 class NetServer 
 {
@@ -31,7 +35,15 @@ class NetServer
 		this.tcpServer = new TcpListener( ipAddress, port );
 		print( 'net.Server.listen(): starting tcp server' );
 		this.tcpServer.Start();
+		this.tcpServer.BeginAcceptTcpClient( listenerCallback, null );
+	}
+	
+	function listenerCallback( result : IAsyncResult ) {
+		print( 'net.server.listenerCallback()' );
+		var client : TcpClient = this.tcpServer.EndAcceptTcpClient( result );
 		
+		// I think we want to raise 'connect' here.
+		// queueWorkItem( { callback: requestCallback, args: [ client.GetStream() ] } );
 	}
 	
 	// TODO: pull this stuff out to an event class
@@ -59,5 +71,5 @@ class NetServer
 			throw "addListener called for unsupported event";
 		}
 	}
-
 }
+} // package

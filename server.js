@@ -7,6 +7,7 @@ import System.Net;
 import System.IO;
 
 import Http;
+import Net;
 
 // takes a .js file on the commandline, eval it 
 var args : String[] = Environment.GetCommandLineArgs();
