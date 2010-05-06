@@ -12,6 +12,17 @@ import Net;
 var manualResetEvent : ManualResetEvent = new ManualResetEvent( false );
 var workItems = [];
 
+function require( file ) {
+	print( 'requiring: ' + file );
+	var sr : StreamReader = new StreamReader( file + '.js' );
+	var fileContents = sr.ReadToEnd();
+	// extra semicolon provided after file contents.. just in case
+	var code = 'var exports = {}; ' + fileContents + '; exports;';
+	sr.Close();
+	print( 'evaluating require: ' + code );
+	return eval( code, 'unsafe' );
+}
+
 // threadsafe enqueue function
 function queueWorkItem( item ) {
 		print( 'queueWorkItem(): queuing item: ' + item );
