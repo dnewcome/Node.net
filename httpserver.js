@@ -30,7 +30,7 @@ class HttpServer
 	function HttpServer( requestCallback ) {
 		var httpListener : HttpListener = new HttpListener();
 		this.httpListener = httpListener;
-		// this.addListener( 'request', requestCallback );
+		this.addListener( 'request', requestCallback );
 		this.requestCallback = requestCallback;
 	}
 
@@ -55,7 +55,8 @@ class HttpServer
 		
 		var httpServerRequest = new HttpServerRequest( request );
 		var httpServerResponse = new HttpServerResponse( response );
-		queueWorkItem( { callback: requestCallback, args: [ request, httpServerResponse ] } );
+		// queueWorkItem( { callback: requestCallback, args: [ request, httpServerResponse ] } );
+		queueWorkItem( { callback: raiseRequestEvent, args: [ request, httpServerResponse ] } );
 	}
 
 } // class
