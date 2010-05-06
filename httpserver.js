@@ -9,7 +9,6 @@ class HttpServer
 	var httpListener : HttpListener;
 	var prefix;
 	var requestCallback;
-	var autoResetEvent : AutoResetEvent = new AutoResetEvent( false );
 
 	function HttpServer( requestCallback ) {
 		var httpListener : HttpListener = new HttpListener();
@@ -22,16 +21,15 @@ class HttpServer
 		var prefix = 'http://' + host + ':' + port + '/';
 		this.httpListener.Prefixes.Add( prefix );
 		this.httpListener.Start();
-		while( true ) {
-			var result : IAsyncResult = this.httpListener.BeginGetContext( ListenerCallback, httpListener );
-			autoResetEvent.WaitOne();
-		}
+		var result : IAsyncResult = this.httpListener.BeginGetContext( ListenerCallback, httpListener );
 	}
 	
 	function ListenerCallback( result : IAsyncResult ) {
 		print( 'ListenerCallback():' );
-		autoResetEvent.Set();
-
+		
+		// TODO: we should probably set up the next call somewhere else
+		this.httpListener.BeginGetContext( ListenerCallback, httpListener );
+		
 		var listener : HttpListener = HttpListener( result.AsyncState );
 		var context : HttpListenerContext = listener.EndGetContext( result );
 		var request : HttpListenerRequest = context.Request;
@@ -39,8 +37,7 @@ class HttpServer
 		
 		// var httpServerRequest = new HttpServerRequest( request );
 		var httpServerResponse = new HttpServerResponse( response );
-		
-		this.requestCallback( request, httpServerResponse );
+		queueWorkItem( { callback: requestCallback, args: [ request, httpServerResponse ] } );
 	}
 
 } // class
