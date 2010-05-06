@@ -10,7 +10,6 @@ import Http;
 import Net;
 
 var manualResetEvent : ManualResetEvent = new ManualResetEvent( false );
-var lock : Object = new Object();
 var workItems = [];
 
 // thread safe enqueue method
