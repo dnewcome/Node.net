@@ -16,15 +16,15 @@ var workItems = [];
 // thread safe enqueue method
 function queueWorkItem( item ) {
 		print( 'queueWorkItem(): queuing item: ' + item );
-		print( 'queueWorkItem(): acquiring lock: ' + lock );
-	Monitor.Enter( lock );
+		print( 'queueWorkItem(): acquiring lock: ' + workItems );
+	Monitor.Enter( workItems );
 	try {
 		workItems.push( item );
 		print( 'queueWorkItem(): item queued' );
 		manualResetEvent.Set();
 	}
 	finally {
-		Monitor.Exit( lock );
+		Monitor.Exit( workItems );
 		print( 'queueWorkItem: released lock' );
 	}
 }
@@ -42,7 +42,7 @@ while( true ) {
 	var callback;
 	
 	// TODO: can we improve locking method?
-	Monitor.Enter( lock );
+	Monitor.Enter( workItems );
 	try {
 		print( 'event loop: acquired lock' );
 		callback = workItems.shift();
@@ -51,7 +51,7 @@ while( true ) {
 		}
 	}
 	finally {
-		Monitor.Exit( lock );
+		Monitor.Exit( workItems );
 		print( 'event loop: released lock' );
 	}
 	
