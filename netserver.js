@@ -40,16 +40,18 @@ class NetStream
 	}
 	
 	function ReadCallback( result : IAsyncResult ) {
-		// TODO: probabaly shouldn't return data as byte[]
-		var chunk = byte[]( result.AsyncState );
-		
+		var buffer = byte[]( result.AsyncState );
 		var bytesRead = this.stream.EndRead( result );
+		
+		// TODO: need to implement setEncoding still, all data returned as utf8
+		var chunk = System.Text.Encoding.UTF8.GetString( buffer, 0, bytesRead );
+		
 		// TODO: better checking of buffer size would shave off an extra read
 		if( bytesRead > 0 ) {
 			// queue work before calling another read, could be out of order otw
 			queueWorkItem( { callback: raiseDataEvent, args: [ chunk ] } );
-			var buffer : byte[] = new byte[ bufferSize ];
-			this.stream.BeginRead( buffer, 0, bufferSize, ReadCallback, buffer );
+			var nextBuffer : byte[] = new byte[ bufferSize ];
+			this.stream.BeginRead( nextBuffer, 0, bufferSize, ReadCallback, nextBuffer );
 		}
 		else {
 			// TODO: node.js docs say end is raised when FIN is sent by 
