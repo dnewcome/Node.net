@@ -12,7 +12,7 @@ import Net;
 var manualResetEvent : ManualResetEvent = new ManualResetEvent( false );
 var workItems = [];
 
-// thread safe enqueue method
+// threadsafe enqueue function
 function queueWorkItem( item ) {
 		print( 'queueWorkItem(): queuing item: ' + item );
 		print( 'queueWorkItem(): acquiring lock: ' + workItems );

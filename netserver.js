@@ -27,7 +27,7 @@ class NetStream
 	var endCallbacks = [];
 	
 	// TODO: this should be defined somewhere else
-	// Using 1k buffer, experimentally seems to be what node.js uses
+	// Using 1k buffer - experimentally, seems to be what node.js uses
 	var bufferSize = 1024; 
 	
 	function NetStream( stream : Stream ) {
@@ -46,7 +46,6 @@ class NetStream
 		// TODO: need to implement setEncoding still, all data returned as utf8
 		var chunk = System.Text.Encoding.UTF8.GetString( buffer, 0, bytesRead );
 		
-		// TODO: better checking of buffer size would shave off an extra read
 		if( bytesRead > 0 ) {
 			// queue work before calling another read, could be out of order otw
 			queueWorkItem( { callback: raiseDataEvent, args: [ chunk ] } );
@@ -56,10 +55,10 @@ class NetStream
 		else {
 			// TODO: node.js docs say end is raised when FIN is sent by 
 			// remote end of socket, not sure if raising 'end' when there
-			// is no more data is the right thing to do
+			// is no more data is the right thing to do. It does the right thing
+			// when using Telnet as the client 
 			raiseEndEvent();
 		}
-		
 	}
 	
 	function addListener( eventname, callback) {
@@ -86,8 +85,7 @@ class NetStream
 		}
 	}
 	
-
-}
+} // class
 
 class NetServer 
 {
@@ -157,5 +155,5 @@ class NetServer
 			throw "addListener called for unsupported event";
 		}
 	}
-}
+} // class
 } // package
