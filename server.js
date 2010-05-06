@@ -9,19 +9,14 @@ import System.IO;
 import Http;
 import Net;
 
-// takes a .js file on the commandline, eval it 
-var args : String[] = Environment.GetCommandLineArgs();
-var sr : StreamReader = new StreamReader( args[1] );
-var script = sr.ReadToEnd();
-eval( script, 'unsafe' );
-sr.Close();
-
 var manualResetEvent : ManualResetEvent = new ManualResetEvent( false );
 var lock : Object = new Object();
 var workItems = [];
 
 // thread safe enqueue method
 function queueWorkItem( item ) {
+		print( 'queueWorkItem(): queuing item: ' + item );
+		print( 'queueWorkItem(): acquiring lock: ' + lock );
 	Monitor.Enter( lock );
 	try {
 		workItems.push( item );
@@ -33,6 +28,13 @@ function queueWorkItem( item ) {
 		print( 'queueWorkItem: released lock' );
 	}
 }
+
+// takes a .js file on the commandline, eval it 
+var args : String[] = Environment.GetCommandLineArgs();
+var sr : StreamReader = new StreamReader( args[1] );
+var script = sr.ReadToEnd();
+eval( script, 'unsafe' );
+sr.Close();
 
 // main event loop
 while( true ) {
@@ -54,8 +56,10 @@ while( true ) {
 	}
 	
 	if( callback != null ) {
-		// TODO: figure out what 'this' should be passed, currently passing null
-		callback.callback.apply( null, callback.args );
+		print( 'event loop: dispatching callback' );
+		// TODO: figure out what 'this' should be passed, currently passing server
+		// which is almost certainly the wrong thing.
+		callback.callback.apply( this, callback.args );
 	}
 	print( 'event loop waiting' );
 	manualResetEvent.WaitOne();
