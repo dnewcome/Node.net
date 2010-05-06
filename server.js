@@ -13,6 +13,18 @@ var manualResetEvent : ManualResetEvent = new ManualResetEvent( false );
 var workItems = [];
 
 function require( file ) {
+	// for compiled-in functionality, return existing references.
+	// TODO: clean up the global namespace, as it is, `http' et al.
+	// are already visible to the user code
+	if( file == 'http' ) {
+		return http;
+	}
+	if( file == 'net' ) {
+		return net;
+	}
+	if( file == 'sys' ) {
+		return sys;
+	}
 	print( 'requiring: ' + file );
 	var sr : StreamReader = new StreamReader( file + '.js' );
 	var fileContents = sr.ReadToEnd();
@@ -22,6 +34,10 @@ function require( file ) {
 	print( 'evaluating require: ' + code );
 	return eval( code, 'unsafe' );
 }
+
+// quick hack to add sys.puts();
+// TODO: `sys' should be implemented in its own class
+var sys = { puts: function( string ){ print( string ); } };
 
 // threadsafe enqueue function
 function queueWorkItem( item ) {
