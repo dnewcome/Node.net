@@ -1,3 +1,7 @@
+var	sys = require( 'sys' ),
+	http = require( 'http' ),
+	net = require( 'net' );
+	
 http.createServer( function( request, response ) {
 	request.addListener( 'data', function( data ) {
 		sys.puts( data );
