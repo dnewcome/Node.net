@@ -55,8 +55,9 @@ class HttpServer
 		
 		var httpServerRequest = new HttpServerRequest( request );
 		var httpServerResponse = new HttpServerResponse( response );
-		// queueWorkItem( { callback: requestCallback, args: [ request, httpServerResponse ] } );
-		queueWorkItem( { callback: raiseRequestEvent, args: [ request, httpServerResponse ] } );
+		queueWorkItem( { callback: raiseRequestEvent, args: [ httpServerRequest, httpServerResponse ] } );
+		
+		httpServerRequest.Read();
 	}
 
 } // class
@@ -65,31 +66,32 @@ class HttpServer
 // wraps .net request with node.js interface
 class HttpServerRequest 
 {
-	var dataCallbacks = [];
-	var endCallbacks = [];
+	// var dataCallbacks = [];
+	// var endCallbacks = [];
+	var netStream;
+	var httpListenerRequest : HttpListenerRequest;
 	
 	function HttpServerRequest( request : HttpListenerRequest ) {
-		
+		httpListenerRequest = request;
+		netStream = new NetStream( request.InputStream );
 	}
 	
-	function raiseDataEvent() {
-		for( var i=0; i < dataCallbacks.length; i++ ) {
-			dataCallbacks[i]();
-		}
+	// Note: is not part of the original Node.js api, used only to 
+	// kick off data events after server request event is queued
+	function Read() {
+		netStream.Read();
 	}
 	
+	// pass through event listeners to underlying stream
 	function addListener( eventname, callback) {
 		if( eventname == 'data' ) {
-			dataCallbacks.push( callback );
+			netStream.addListener( 'data', callback );
 		}
 		else if( eventname == 'end' ) {
-			endCallbacks.push( callback );
+			netStream.addListener( 'end', callback );
 		}
-		else {
-			throw "addListener called for unsupported event";
-		}
-
 	}
+
 }
 
 class HttpServerResponse
