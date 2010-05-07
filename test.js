@@ -1,6 +1,12 @@
 http.createServer( function( request, response ) {
-	response.write( '<html><body> Hello world!</body></html>' );
-	response.end();
+	request.addListener( 'data', function( data ) {
+		sys.puts( data );
+	});
+	request.addListener( 'end', function() {
+		response.write( '<html><body><p>All finished!<p></body></html>' );
+		response.end();
+	});
+	
 }).listen( 9981, 'localhost' );
 
 net.createServer( function( stream ) {
