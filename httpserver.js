@@ -9,7 +9,6 @@ class HttpServer
 	var httpListener : HttpListener;
 	var prefix;
 	var requestCallbacks = [];
-	var requestCallback;
 	
 	function raiseRequestEvent( req, res ) {
 		print( 'http.server.raiseRequestEvent()' );
@@ -23,7 +22,7 @@ class HttpServer
 			requestCallbacks.push( callback );
 		}
 		else {
-			throw "addListener called for unsupported event";
+			throw "addListener called for unsupported event:" + eventname;
 		}
 	}
 	
@@ -31,7 +30,6 @@ class HttpServer
 		var httpListener : HttpListener = new HttpListener();
 		this.httpListener = httpListener;
 		this.addListener( 'request', requestCallback );
-		this.requestCallback = requestCallback;
 	}
 
 	function listen( port, host ) {
@@ -57,6 +55,8 @@ class HttpServer
 		var httpServerResponse = new HttpServerResponse( response );
 		queueWorkItem( { callback: raiseRequestEvent, args: [ httpServerRequest, httpServerResponse ] } );
 		
+		// we can start reading now without queueing on dispatch, since the data
+		// will not be dispatched until after the request event fires
 		httpServerRequest.Read();
 	}
 
@@ -66,8 +66,6 @@ class HttpServer
 // wraps .net request with node.js interface
 class HttpServerRequest 
 {
-	// var dataCallbacks = [];
-	// var endCallbacks = [];
 	var netStream;
 	var httpListenerRequest : HttpListenerRequest;
 	
@@ -77,9 +75,11 @@ class HttpServerRequest
 	}
 	
 	// Note: is not part of the original Node.js api, used only to 
-	// kick off data events after server request event is queued
+	// kick off data events after server request event is queued. We denote
+	// this by using uppercase method name
 	function Read() {
-		netStream.Read();
+		print( 'HttpServerRequest.Read()' );
+		netStream.read();
 	}
 	
 	// pass through event listeners to underlying stream
@@ -97,13 +97,15 @@ class HttpServerRequest
 class HttpServerResponse
 {
 	var httpResponse : HttpListenerResponse;
+	var netStream;
 	
 	function HttpServerResponse( httpResponse ) {
 		this.httpResponse = httpResponse;
+		this.netStream = new NetStream( httpResponse.OutputStream );
 	}
 	
 	function writeHead( statusCode, headers ) {
-	
+		throw "writeHead unimplemented";
 	}
 	
 	function end() {
@@ -111,7 +113,12 @@ class HttpServerResponse
 		output.Close();
 	}
 	
+	function write( chunk, encoding ) {
+		print( 'HttpServerResponse.write(): ' + chunk );
+		netStream.write( chunk, encoding );
+	}
 	// default encoding is UTF8
+	/*
 	function write( chunk, encoding ) {
 		// TODO: not sure how .net handles js strings. everything works if we 
 		// don't explicitly type chunkString, but I'm not sure about things yet
@@ -120,11 +127,17 @@ class HttpServerResponse
 		httpResponse.ContentLength64 += buffer.Length;
 		
 		var output : Stream = httpResponse.OutputStream;
+		
+		// TODO: we are using a blocking call to write() - need to make this
+		// async
 		output.Write( buffer, 0, buffer.Length );
 	}
+	*/
 }
 
-// createServer must be encapsulated in a class
+// createServer must be encapsulated in a class. We choose http as the class
+// name to match the api, not sure if this is a good idea or not now that we
+// have 'require' working
 class http {
 	static function createServer( callback ) {
 		return new HttpServer( callback );
