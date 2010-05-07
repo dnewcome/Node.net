@@ -34,11 +34,11 @@ class NetStream
 		this.stream = stream;
 	}
 
-	function Read() {
+	function read() {
 		var buffer : byte[] = new byte[ bufferSize ];
 		this.stream.BeginRead( buffer, 0, bufferSize, ReadCallback, buffer );
 	}
-	
+		
 	function ReadCallback( result : IAsyncResult ) {
 		var buffer = byte[]( result.AsyncState );
 		var bytesRead = this.stream.EndRead( result );
@@ -60,6 +60,12 @@ class NetStream
 			queueWorkItem( { callback: raiseEndEvent, args: [] } );
 		}
 	}
+
+	// TODO: encoding is assumed to be utf8, need to implement encoding types
+	function write( chunk, encoding ) {
+		var buffer : byte[] = System.Text.Encoding.UTF8.GetBytes( chunk );
+		this.stream.Write( buffer, 0, buffer.Length );
+	}
 	
 	function addListener( eventname, callback) {
 		if( eventname == 'data' ) {
@@ -75,7 +81,6 @@ class NetStream
 		for( var i=0; i < dataCallbacks.length; i++ ) {
 			dataCallbacks[i]( chunk );
 		}
-		// Should we delete the chunk after we call listeners?
 	}
 	
 	function raiseEndEvent() {
@@ -98,7 +103,7 @@ class NetServer
 		this.addListener( 'connection', callback );
 	}
 	
-	// in Node.js, listen is async, here it blocks on Start()
+	// in Node.js, listen is async, here it blocks on call to Start()
 	function listen( port, host ) {
 		var ipAddress : IPAddress = Dns.Resolve( host ).AddressList[0];
 		this.tcpServer = new TcpListener( ipAddress, port );
@@ -119,7 +124,7 @@ class NetServer
 		queueWorkItem( { callback: raiseConnectionEvent, args: [ stream ] } );
 		
 		// kick off async read
-		stream.Read();
+		stream.read();
 	}
 	
 	// TODO: pull this stuff out to an event class
