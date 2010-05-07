@@ -42,7 +42,7 @@ class NetStream
 	function ReadCallback( result : IAsyncResult ) {
 		var buffer = byte[]( result.AsyncState );
 		var bytesRead = this.stream.EndRead( result );
-		
+		print( 'ReadCallback(): read ' + bytesRead + 'bytes from stream' );
 		// TODO: need to implement setEncoding still, all data returned as utf8
 		var chunk = System.Text.Encoding.UTF8.GetString( buffer, 0, bytesRead );
 		
@@ -57,7 +57,7 @@ class NetStream
 			// remote end of socket, not sure if raising 'end' when there
 			// is no more data is the right thing to do. It does the right thing
 			// when using Telnet as the client 
-			raiseEndEvent();
+			queueWorkItem( { callback: raiseEndEvent, args: [] } );
 		}
 	}
 	
