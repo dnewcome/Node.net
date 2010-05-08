@@ -1,24 +1,19 @@
-/**
-* socket implementation for node.net
-*/
-
-import System;
-import System.Threading;
-import System.Net;
 import System.Net.Sockets;
-import System.IO;
 
+/**
+* Net package implements the `net' module in the Node.js API, currently
+*	Stream and Server - using the .NET equivalents Stream and TcpListener
+*/
 package Net 
 {
 
-class net 
-{
+// Forms the `net' namespace
+class net {
 	static function createServer( callback ) {
 		return new NetServer( callback );
 	}
 }
 
-// wrapper around .net stream
 class NetStream
 {
 	// .NET Stream type
@@ -140,10 +135,6 @@ class NetServer
 		for( var i=0; i < connectionCallbacks.length; i++ ) {
 			connectionCallbacks[i]( stream );
 		}
-	}
-	
-	function close() {
-		
 	}
 	
 	function addListener( eventname, callback) {
