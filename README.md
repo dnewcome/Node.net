@@ -7,7 +7,7 @@
 
 # What is implemented
 
-- Enough of the `http’ module to implement a basic server that handles post data and sends back response
+- Enough of the `http' module to implement a basic server that handles post data and sends back response
 - Enough of the `net' module to implement a TCP server that echoes requests to stdout
 - Enough of the `stream' api to support the above
 -require()
