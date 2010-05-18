@@ -6,6 +6,86 @@ using namespace v8;
 using namespace System::Net::Sockets;
 using namespace System::Net;
 using namespace System::Threading;
+using namespace System::IO;
+
+ref class NetStream {
+private:
+	Stream^ stream;
+	static const int bufferSize = 1024;
+	std::vector<Handle<Function>>* dataCallbacks;
+	std::vector<Handle<Function>>* endCallbacks;
+	
+	Handle<v8::Object>* callbackReceiver;
+	
+public:
+	NetStream( Stream^ in_stream, Handle<v8::Object>* in_receiver ) {
+		dataCallbacks = new std::vector<Handle<Function>>();
+		endCallbacks = new std::vector<Handle<Function>>();
+		stream = in_stream;
+		
+		// TODO: we are temporarily passing receiver object here
+		callbackReceiver = in_receiver;
+
+	}
+	void read() {
+		array<unsigned char>^ buffer = gcnew array<unsigned char>( bufferSize );
+		System::AsyncCallback^ ReadCallbackDelegate = gcnew System::AsyncCallback( this, &NetStream::ReadCallback );
+		this->stream->BeginRead( buffer, 0, bufferSize, ReadCallbackDelegate, buffer );
+	}
+	
+	void ReadCallback( System::IAsyncResult^ result ) {
+		array<unsigned char>^ buffer = ( array<unsigned char>^ )result->AsyncState;
+		int bytesRead = this->stream->EndRead( result );
+		printf( "ReadCallback(): read %i bytes from stream\n", bytesRead );
+		System::String^ chunk = System::Text::Encoding::UTF8->GetString( buffer, 0, bytesRead );
+		
+		if( bytesRead > 0 ) {
+
+			System::Console::WriteLine( chunk );
+
+			// queueWorkItem( { callback: raiseDataEvent, args: [ chunk ] } );
+			array<unsigned char>^ nextBuffer = gcnew array<unsigned char>( bufferSize );
+			System::AsyncCallback^ ReadCallbackDelegate = gcnew System::AsyncCallback( this, &NetStream::ReadCallback );
+			this->stream->BeginRead( nextBuffer, 0, bufferSize, ReadCallbackDelegate, nextBuffer );
+		}
+		else {
+			// queueWorkItem( { callback: raiseEndEvent, args: [] } );
+		}
+		
+	}
+	
+	
+	void write( System::String^ chunk /*, TODO: encoding */ ) {
+		array<unsigned char>^ buffer = System::Text::Encoding::UTF8->GetBytes( chunk );
+		this->stream->Write( buffer, 0, buffer->Length );
+	}
+	
+	void addListener( System::String^ eventname, Handle<Function> callback ) {
+		if( eventname == "data" ) {
+			dataCallbacks->push_back( callback );
+		}
+		else if( eventname == "end" ) {
+			endCallbacks->push_back( callback );
+		}
+	}
+	
+	void raiseDataEvent( System::String^ chunk ) {
+		printf( "net.stream.raiseDataEvent()\n" );
+		for( int i=0; i < dataCallbacks->size(); i++ ) {
+			Handle<Function> fn = dataCallbacks->at(i);
+			// fn->Call( chunk );
+		}
+	}
+	
+	void raiseEndEvent() {
+		printf( "net.stream.raiseEndEvent()\n" );
+		for( int i=0; i < endCallbacks->size(); i++ ) {
+			Handle<Function> fn = endCallbacks->at(i);
+			// fn->Call();
+		}
+	}
+
+};
 
 ref class NetServer {
 private:
@@ -14,13 +94,18 @@ private:
 	std::vector<Handle<Function>>* connectionCallbacks;
 	std::vector<Handle<Function>>* closeCallbacks;
 	
+	Handle<v8::Object>* callbackReceiver;
+	
 public:
 	// constructor takes a v8 handle for callback
-	NetServer( Handle<Function> in_callback ) {
+	NetServer( Handle<Function> in_callback, Handle<v8::Object>* in_receiver ) {
 		listeningCallbacks = new std::vector<Handle<Function>>();
 		connectionCallbacks = new std::vector<Handle<Function>>();
 		closeCallbacks = new std::vector<Handle<Function>>();
-		// listeningCallbacks->push_back( in_callback );
+		
+		// TODO: we are temporarily passing receiver object here
+		callbackReceiver = in_receiver;
+		
 		AddListener( "listening", in_callback );
 	}
 	
@@ -52,16 +137,13 @@ public:
 		this->tcpListener->BeginAcceptTcpClient( ListenerCallbackDelegate, NULL );
 		
 		TcpClient^ client = this->tcpListener->EndAcceptTcpClient( result );
-		System::IO::Stream^ stream = client->GetStream();
+		NetStream^ stream = gcnew NetStream( client->GetStream(), callbackReceiver );
+		
 		//queueWorkItem( { callback: raiseConnectionEvent, args: [ stream ] } );
 		RaiseConnectionEvent();
 		
 		// kick off async read
-		// stream.read();
-		System::IO::StreamReader^ sr = gcnew System::IO::StreamReader( stream );
-		System::String^ data = sr->ReadToEnd();
-		System::Console::WriteLine( data );
-		
+		stream->read();
 	}
 	
 	void RaiseListeningEvent() {
@@ -69,14 +151,14 @@ public:
 		printf( "http.server.raiseListeningEvent(): calling %i callbacks\n", (int)this->listeningCallbacks->size() );
 		for( int i=0; i < listeningCallbacks->size(); i++ ) {
 			Handle<Function> fn = listeningCallbacks->at(i);
-			// fn->Call();
+			fn->Call( *callbackReceiver, NULL, NULL );
 		}
 	}
 	void RaiseConnectionEvent() {
 		printf( "%s\n", "http.server.RaiseConnectionEvent()" );
 		for( int i=0; i < connectionCallbacks->size(); i++ ) {
 			Handle<Function> fn = connectionCallbacks->at(i);
-			// fn->Call();
+			fn->Call( *callbackReceiver, NULL, NULL );
 		}
 	}
 	
@@ -96,9 +178,6 @@ public:
 	}
 };
 
-class NetStream {
-
-};
 
 int main(int argc, char* argv[]) {
 	HandleScope handle_scope;
@@ -117,7 +196,7 @@ int main(int argc, char* argv[]) {
 	Local<FunctionTemplate> cbTemplate = FunctionTemplate::New();
 	Local<Function> cbFunction = cbTemplate->GetFunction();
 	
-	NetServer^ netServer = gcnew NetServer( cbFunction );
+	NetServer^ netServer = gcnew NetServer( cbFunction, &context->Global() );
 	netServer->Listen( 9980, "localhost" );
 	Thread::Sleep( Timeout::Infinite );
 }
