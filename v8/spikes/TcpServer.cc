@@ -1,5 +1,7 @@
 #include <v8.h>
 #include <vector>
+// needed for gcroot
+#include <vcclr.h>
 #using <System.dll>
 
 using namespace v8;
@@ -84,7 +86,7 @@ public:
 			// fn->Call();
 		}
 	}
-
+	
 };
 
 ref class NetServer {
@@ -184,10 +186,43 @@ public:
 // This callback is the native code associated with a v8 function.
 // Eventually all of the v8 functions that we call will come from compiled
 // scripts
-v8::Handle<v8::Value> listeningCallback( const v8::Arguments& args ) {
+v8::Handle<v8::Value> listenCallback( const v8::Arguments& args ) {
 	HandleScope handle_scope;
-	printf( "called v8 listening callback\n" );		
+	printf( "called v8 listen callback\n" );
+	
+	Local<Object> self = args.This();
+	Local<Value> p = self->GetInternalField(0);
+	Local<External> wrap = Local<External>::Cast( p );
+    void* ptr = wrap->Value();
+    // NetServer value = static_cast<NetServer*>(ptr);
+
 	return v8::Undefined();
+}
+
+v8::Handle<v8::Value> addListenerCallback( const v8::Arguments& args ) {
+	HandleScope handle_scope;
+	printf( "called v8 addListenerCallback\n" );		
+	return v8::Undefined();
+}
+
+v8::Handle<v8::Value> createServerCallback( const v8::Arguments& args ) {
+	HandleScope handle_scope;
+	printf( "called v8 createServer callback\n" );		
+	
+	Handle<Function> fn = Handle<Function>::Cast( args[0] );
+	NetServer^ netServer = gcnew NetServer( fn, &args.This() );
+	// TODO: create js wrapper around netServer and return it
+	Handle<ObjectTemplate> serverObjTempl = ObjectTemplate::New();
+	serverObjTempl->SetInternalFieldCount(1);
+	serverObjTempl->Set( String::New( "listen" ), FunctionTemplate::New( listenCallback ) );
+	
+	Local<Object> obj = serverObjTempl->NewInstance();
+	// pin_ptr<NetServer^> p = &netServer;
+	gcroot<NetServer^>* p = netServer;
+	obj->SetInternalField( 0, External::New( p ) );
+	
+	return obj;
+	// return v8::Undefined();
 }
 
 int main(int argc, char* argv[]) {
@@ -196,15 +231,20 @@ int main(int argc, char* argv[]) {
 	
 	// create global and context
 	v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
+	Local<FunctionTemplate> createServerCallbackTemplate = FunctionTemplate::New( createServerCallback );
+	global->Set( String::New( "createServer" ), createServerCallbackTemplate );
 	v8::Handle<v8::Context> context = v8::Context::New(NULL, global);
 	v8::Context::Scope context_scope(context);
 
 	// note: GetFunction() fails if there is no context 
-	Local<FunctionTemplate> cbTemplate = FunctionTemplate::New( listeningCallback );
+	Local<FunctionTemplate> cbTemplate = FunctionTemplate::New( listenCallback );
 	Local<Function> cbFunction = cbTemplate->GetFunction();
+
+	Handle<Script> script = Script::Compile( String::New( "createServer( function( stream ){ }, this ).listen( 9980, 'localhost' );") );
+	Handle<Value> scriptresult = script->Run();
 	
-	NetServer^ netServer = gcnew NetServer( cbFunction, &context->Global() );
-	netServer->Listen( 9980, "localhost" );
+	// NetServer^ netServer = gcnew NetServer( cbFunction, &context->Global() );
+	// netServer->Listen( 9980, "localhost" );
 	
 	Thread::Sleep( Timeout::Infinite );
 }
