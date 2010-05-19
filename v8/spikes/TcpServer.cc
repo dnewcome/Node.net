@@ -9,6 +9,11 @@ using namespace System::Net::Sockets;
 using namespace System::Net;
 using namespace System::Threading;
 using namespace System::IO;
+using namespace System::Runtime::InteropServices;
+
+const char* ToCString(const v8::String::Utf8Value& value) {
+  return *value ? *value : "<string conversion failed>";
+}
 
 ref class NetStream {
 private:
@@ -195,7 +200,8 @@ v8::Handle<v8::Value> listenCallback( const v8::Arguments& args ) {
 	Local<External> wrap = Local<External>::Cast( p );
     void* ptr = wrap->Value();
     // NetServer value = static_cast<NetServer*>(ptr);
-
+	NetServer^ h = (NetServer^)(GCHandle::FromIntPtr( System::IntPtr( ptr ) ) ).Target;
+	h->Listen( 9980, "localhost" );
 	return v8::Undefined();
 }
 
@@ -209,7 +215,13 @@ v8::Handle<v8::Value> createServerCallback( const v8::Arguments& args ) {
 	HandleScope handle_scope;
 	printf( "called v8 createServer callback\n" );		
 	
-	Handle<Function> fn = Handle<Function>::Cast( args[0] );
+	// callback must be persistent since we call it outside of this scope
+	// TODO: need to figure out when to dispose -- probably only on unregister, 
+	// which we haven't implemented yet.
+	Persistent<Function> fn = Persistent<Function>::New( Handle<Function>::Cast( args[0] ) );
+	
+	String::Utf8Value str( (*fn)->ToString() );
+	printf( "function is: %s\n", ToCString( str ) );
 	NetServer^ netServer = gcnew NetServer( fn, &args.This() );
 	// TODO: create js wrapper around netServer and return it
 	Handle<ObjectTemplate> serverObjTempl = ObjectTemplate::New();
@@ -218,11 +230,11 @@ v8::Handle<v8::Value> createServerCallback( const v8::Arguments& args ) {
 	
 	Local<Object> obj = serverObjTempl->NewInstance();
 	// pin_ptr<NetServer^> p = &netServer;
-	gcroot<NetServer^>* p = netServer;
-	obj->SetInternalField( 0, External::New( p ) );
+	GCHandle p = GCHandle::Alloc( netServer );
+	void* pv = (void*)GCHandle::ToIntPtr(p);
+	obj->SetInternalField( 0, External::New( pv ) );
 	
 	return obj;
-	// return v8::Undefined();
 }
 
 int main(int argc, char* argv[]) {
@@ -240,7 +252,7 @@ int main(int argc, char* argv[]) {
 	Local<FunctionTemplate> cbTemplate = FunctionTemplate::New( listenCallback );
 	Local<Function> cbFunction = cbTemplate->GetFunction();
 
-	Handle<Script> script = Script::Compile( String::New( "createServer( function( stream ){ }, this ).listen( 9980, 'localhost' );") );
+	Handle<Script> script = Script::Compile( String::New( "createServer( function( stream ){ } ).listen( 9980, 'localhost' );") );
 	Handle<Value> scriptresult = script->Run();
 	
 	// NetServer^ netServer = gcnew NetServer( cbFunction, &context->Global() );
