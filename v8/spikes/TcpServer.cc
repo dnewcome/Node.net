@@ -140,7 +140,9 @@ public:
 		NetStream^ stream = gcnew NetStream( client->GetStream(), callbackReceiver );
 		
 		//queueWorkItem( { callback: raiseConnectionEvent, args: [ stream ] } );
-		RaiseConnectionEvent();
+		
+		// TODO: we need wrapper object around NetStream to pass here
+		RaiseConnectionEvent( v8::Undefined() );
 		
 		// kick off async read
 		stream->read();
@@ -154,11 +156,12 @@ public:
 			fn->Call( *callbackReceiver, NULL, NULL );
 		}
 	}
-	void RaiseConnectionEvent() {
+	void RaiseConnectionEvent( Handle<Value> stream ) {
 		printf( "%s\n", "http.server.RaiseConnectionEvent()" );
 		for( int i=0; i < connectionCallbacks->size(); i++ ) {
 			Handle<Function> fn = connectionCallbacks->at(i);
-			fn->Call( *callbackReceiver, NULL, NULL );
+			Handle<Value> args[] = { stream };
+			fn->Call( *callbackReceiver, 1, args );
 		}
 	}
 	
@@ -178,14 +181,18 @@ public:
 	}
 };
 
+// This callback is the native code associated with a v8 function.
+// Eventually all of the v8 functions that we call will come from compiled
+// scripts
+v8::Handle<v8::Value> listeningCallback( const v8::Arguments& args ) {
+	HandleScope handle_scope;
+	printf( "called v8 listening callback\n" );		
+	return v8::Undefined();
+}
 
 int main(int argc, char* argv[]) {
-	HandleScope handle_scope;
-	
-	// Handle<FunctionTemplate> createservertemplate = FunctionTemplate::New( createServerCallback );
-	// global_templ->Set( String::New("createServer"), putstemplate );
-	
-	printf("%s\n", "working" );
+	printf("%s\n", "entered main()" );
+	HandleScope handle_scope;	
 	
 	// create global and context
 	v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
@@ -193,10 +200,11 @@ int main(int argc, char* argv[]) {
 	v8::Context::Scope context_scope(context);
 
 	// note: GetFunction() fails if there is no context 
-	Local<FunctionTemplate> cbTemplate = FunctionTemplate::New();
+	Local<FunctionTemplate> cbTemplate = FunctionTemplate::New( listeningCallback );
 	Local<Function> cbFunction = cbTemplate->GetFunction();
 	
 	NetServer^ netServer = gcnew NetServer( cbFunction, &context->Global() );
 	netServer->Listen( 9980, "localhost" );
+	
 	Thread::Sleep( Timeout::Infinite );
 }
