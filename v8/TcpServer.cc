@@ -1,3 +1,11 @@
+/**
+* Node.net is a .NET implementation of Node.js and is free 
+*	software provided under the MIT license.
+*
+*	See LICENSE file for full text of the license.
+*	Copyright 2010 Dan Newcome.
+*/
+
 #include <v8.h>
 #include <vector>
 #using <System.dll>
