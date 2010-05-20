@@ -1,8 +1,9 @@
 #include <v8.h>
 #include <vector>
-// needed for gcroot
-#include <vcclr.h>
 #using <System.dll>
+
+// atlstr lets us use CString
+#include <atlstr.h>
 
 using namespace v8;
 using namespace System::Net::Sockets;
@@ -14,6 +15,9 @@ using namespace System::Runtime::InteropServices;
 const char* ToCString(const v8::String::Utf8Value& value) {
   return *value ? *value : "<string conversion failed>";
 }
+
+// prototype ... 
+v8::Handle<v8::Value> addListenerCallback( const v8::Arguments& args );
 
 ref class NetStream {
 private:
@@ -47,10 +51,9 @@ public:
 		System::String^ chunk = System::Text::Encoding::UTF8->GetString( buffer, 0, bytesRead );
 		
 		if( bytesRead > 0 ) {
-
-			System::Console::WriteLine( chunk );
-
 			// queueWorkItem( { callback: raiseDataEvent, args: [ chunk ] } );
+			raiseDataEvent( chunk );
+			
 			array<unsigned char>^ nextBuffer = gcnew array<unsigned char>( bufferSize );
 			System::AsyncCallback^ ReadCallbackDelegate = gcnew System::AsyncCallback( this, &NetStream::ReadCallback );
 			this->stream->BeginRead( nextBuffer, 0, bufferSize, ReadCallbackDelegate, nextBuffer );
@@ -78,9 +81,14 @@ public:
 	
 	void raiseDataEvent( System::String^ chunk ) {
 		printf( "net.stream.raiseDataEvent()\n" );
+
+		CString str( chunk ); 
+		Handle<String> chunkString = String::New( str );
+		Handle<Value> args[] = { chunkString };
+		
 		for( int i=0; i < dataCallbacks->size(); i++ ) {
 			Handle<Function> fn = dataCallbacks->at(i);
-			// fn->Call( chunk );
+			fn->Call( *callbackReceiver, 1, args );
 		}
 	}
 	
@@ -113,7 +121,7 @@ public:
 		// TODO: we are temporarily passing receiver object here
 		callbackReceiver = in_receiver;
 		
-		AddListener( "listening", in_callback );
+		AddListener( "connection", in_callback );
 	}
 	
 	NetServer() {
@@ -149,12 +157,21 @@ public:
 		//queueWorkItem( { callback: raiseConnectionEvent, args: [ stream ] } );
 		
 		// TODO: we need wrapper object around NetStream to pass here
-		RaiseConnectionEvent( v8::Undefined() );
+		Handle<ObjectTemplate> streamObjTempl = ObjectTemplate::New();
+		streamObjTempl->SetInternalFieldCount(1);
+		streamObjTempl->Set( String::New( "addListener" ), FunctionTemplate::New( addListenerCallback ) );
+		Local<v8::Object> obj = streamObjTempl->NewInstance();
+		
+		GCHandle p = GCHandle::Alloc( stream );
+		void* pv = (void*)GCHandle::ToIntPtr(p);
+		obj->SetInternalField( 0, External::New( pv ) );
+		
+		RaiseConnectionEvent( obj );
 		
 		// kick off async read
 		stream->read();
 	}
-	
+
 	void RaiseListeningEvent() {
 		printf( "%s\n", "http.server.raiseListeningEvent()" );
 		printf( "http.server.raiseListeningEvent(): calling %i callbacks\n", (int)this->listeningCallbacks->size() );
@@ -205,11 +222,7 @@ v8::Handle<v8::Value> listenCallback( const v8::Arguments& args ) {
 	return v8::Undefined();
 }
 
-v8::Handle<v8::Value> addListenerCallback( const v8::Arguments& args ) {
-	HandleScope handle_scope;
-	printf( "called v8 addListenerCallback\n" );		
-	return v8::Undefined();
-}
+
 
 v8::Handle<v8::Value> createServerCallback( const v8::Arguments& args ) {
 	HandleScope handle_scope;
@@ -222,6 +235,7 @@ v8::Handle<v8::Value> createServerCallback( const v8::Arguments& args ) {
 	
 	String::Utf8Value str( (*fn)->ToString() );
 	printf( "function is: %s\n", ToCString( str ) );
+	
 	NetServer^ netServer = gcnew NetServer( fn, &args.This() );
 	// TODO: create js wrapper around netServer and return it
 	Handle<ObjectTemplate> serverObjTempl = ObjectTemplate::New();
@@ -237,6 +251,38 @@ v8::Handle<v8::Value> createServerCallback( const v8::Arguments& args ) {
 	return obj;
 }
 
+/**
+* FunctionCallback is wired up to the javascript `puts()' function.
+* we want to use this for doing sys.puts() node API call
+*/
+v8::Handle<v8::Value> PutsCallback( const v8::Arguments& args ) {
+	HandleScope handle_scope;
+
+	// convert first arg to cstring
+	v8::String::Utf8Value str( args[0] );
+	const char* cstr = ToCString( str );
+
+	printf( "%s\n", cstr );
+	return v8::Undefined();
+}
+
+v8::Handle<v8::Value> addListenerCallback( const v8::Arguments& args ) {
+	HandleScope handle_scope;
+	printf( "called v8 addListenerCallback\n" );	
+	
+	Local<Object> self = args.This();
+	Local<Value> p = self->GetInternalField(0);
+	Local<External> wrap = Local<External>::Cast( p );
+    void* ptr = wrap->Value();
+	NetStream^ h = (NetStream^)(GCHandle::FromIntPtr( System::IntPtr( ptr ) ) ).Target;
+	
+	Persistent<Function> fn = Persistent<Function>::New( Handle<Function>::Cast( args[0] ) );
+	
+	// note we have listener type hard coded
+	h->addListener( "data", fn );
+	return v8::Undefined();
+}
+
 int main(int argc, char* argv[]) {
 	printf("%s\n", "entered main()" );
 	HandleScope handle_scope;	
@@ -245,18 +291,16 @@ int main(int argc, char* argv[]) {
 	v8::Handle<v8::ObjectTemplate> global = v8::ObjectTemplate::New();
 	Local<FunctionTemplate> createServerCallbackTemplate = FunctionTemplate::New( createServerCallback );
 	global->Set( String::New( "createServer" ), createServerCallbackTemplate );
+
+	Local<FunctionTemplate> putstemplate = FunctionTemplate::New( PutsCallback );
+	global->Set( String::New("puts"), putstemplate );
+
 	v8::Handle<v8::Context> context = v8::Context::New(NULL, global);
 	v8::Context::Scope context_scope(context);
 
-	// note: GetFunction() fails if there is no context 
-	Local<FunctionTemplate> cbTemplate = FunctionTemplate::New( listenCallback );
-	Local<Function> cbFunction = cbTemplate->GetFunction();
-
-	Handle<Script> script = Script::Compile( String::New( "createServer( function( stream ){ } ).listen( 9980, 'localhost' );") );
+	Handle<Script> script = Script::Compile( String::New( "createServer( function( stream ){ stream.addListener( function( data ){ puts(data);} ); } ).listen( 9980, 'localhost' );") );
 	Handle<Value> scriptresult = script->Run();
 	
-	// NetServer^ netServer = gcnew NetServer( cbFunction, &context->Global() );
-	// netServer->Listen( 9980, "localhost" );
 	
 	Thread::Sleep( Timeout::Infinite );
 }
