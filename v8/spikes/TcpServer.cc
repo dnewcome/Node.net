@@ -12,7 +12,7 @@ using namespace System::Threading;
 using namespace System::IO;
 using namespace System::Runtime::InteropServices;
 
-const char* ToCString(const v8::String::Utf8Value& value) {
+const char* ToCString( const v8::String::Utf8Value& value ) {
   return *value ? *value : "<string conversion failed>";
 }
 
@@ -38,9 +38,11 @@ public:
 		callbackReceiver = in_receiver;
 
 	}
+	
 	void read() {
 		array<unsigned char>^ buffer = gcnew array<unsigned char>( bufferSize );
-		System::AsyncCallback^ ReadCallbackDelegate = gcnew System::AsyncCallback( this, &NetStream::ReadCallback );
+		System::AsyncCallback^ ReadCallbackDelegate = 
+			gcnew System::AsyncCallback( this, &NetStream::ReadCallback );
 		this->stream->BeginRead( buffer, 0, bufferSize, ReadCallbackDelegate, buffer );
 	}
 	
@@ -48,15 +50,21 @@ public:
 		array<unsigned char>^ buffer = ( array<unsigned char>^ )result->AsyncState;
 		int bytesRead = this->stream->EndRead( result );
 		printf( "ReadCallback(): read %i bytes from stream\n", bytesRead );
-		System::String^ chunk = System::Text::Encoding::UTF8->GetString( buffer, 0, bytesRead );
+		System::String^ chunk = 
+			System::Text::Encoding::UTF8->GetString( buffer, 0, bytesRead );
 		
 		if( bytesRead > 0 ) {
+			// TODO: we haven't implemented any queue or locking yet
 			// queueWorkItem( { callback: raiseDataEvent, args: [ chunk ] } );
 			raiseDataEvent( chunk );
 			
-			array<unsigned char>^ nextBuffer = gcnew array<unsigned char>( bufferSize );
-			System::AsyncCallback^ ReadCallbackDelegate = gcnew System::AsyncCallback( this, &NetStream::ReadCallback );
-			this->stream->BeginRead( nextBuffer, 0, bufferSize, ReadCallbackDelegate, nextBuffer );
+			array<unsigned char>^ nextBuffer = 
+				gcnew array<unsigned char>( bufferSize );
+			System::AsyncCallback^ ReadCallbackDelegate = 
+				gcnew System::AsyncCallback( this, &NetStream::ReadCallback );
+			this->stream->BeginRead( 
+				nextBuffer, 0, bufferSize, ReadCallbackDelegate, nextBuffer 
+			);
 		}
 		else {
 			// queueWorkItem( { callback: raiseEndEvent, args: [] } );
@@ -66,7 +74,8 @@ public:
 	
 	
 	void write( System::String^ chunk /*, TODO: encoding */ ) {
-		array<unsigned char>^ buffer = System::Text::Encoding::UTF8->GetBytes( chunk );
+		array<unsigned char>^ buffer = 
+			System::Text::Encoding::UTF8->GetBytes( chunk );
 		this->stream->Write( buffer, 0, buffer->Length );
 	}
 	
@@ -142,14 +151,16 @@ public:
 		// queueWorkItem( { callback: raiseListeningEvent, args: [] } );
 		RaiseListeningEvent();
 		
-		System::AsyncCallback^ ListenerCallbackDelegate = gcnew System::AsyncCallback( this, &NetServer::ListenerCallback );
-		this->tcpListener->BeginAcceptTcpClient( ListenerCallbackDelegate, NULL );
+		System::AsyncCallback^ ListenerCallbackDelegate = 
+			gcnew System::AsyncCallback( this, &NetServer::ListenerCallback );
+		this->tcpListener->BeginAcceptTcpClient( ListenerCallbackDelegate, nullptr );
 	}
 	
 	void ListenerCallback( System::IAsyncResult^ result ) {
 		printf("%s\n", "listener called" );
-		System::AsyncCallback^ ListenerCallbackDelegate = gcnew System::AsyncCallback( this, &NetServer::ListenerCallback );
-		this->tcpListener->BeginAcceptTcpClient( ListenerCallbackDelegate, NULL );
+		System::AsyncCallback^ ListenerCallbackDelegate = 
+			gcnew System::AsyncCallback( this, &NetServer::ListenerCallback );
+		this->tcpListener->BeginAcceptTcpClient( ListenerCallbackDelegate, nullptr );
 		
 		TcpClient^ client = this->tcpListener->EndAcceptTcpClient( result );
 		NetStream^ stream = gcnew NetStream( client->GetStream(), callbackReceiver );
@@ -159,7 +170,9 @@ public:
 		// TODO: we need wrapper object around NetStream to pass here
 		Handle<ObjectTemplate> streamObjTempl = ObjectTemplate::New();
 		streamObjTempl->SetInternalFieldCount(1);
-		streamObjTempl->Set( String::New( "addListener" ), FunctionTemplate::New( addListenerCallback ) );
+		streamObjTempl->Set( 
+			String::New( "addListener" ), FunctionTemplate::New( addListenerCallback ) 
+		);
 		Local<v8::Object> obj = streamObjTempl->NewInstance();
 		
 		GCHandle p = GCHandle::Alloc( stream );
@@ -174,7 +187,10 @@ public:
 
 	void RaiseListeningEvent() {
 		printf( "%s\n", "http.server.raiseListeningEvent()" );
-		printf( "http.server.raiseListeningEvent(): calling %i callbacks\n", (int)this->listeningCallbacks->size() );
+		printf( 
+			"http.server.raiseListeningEvent(): calling %i callbacks\n", 
+			( int )this->listeningCallbacks->size() 
+		);
 		for( int i=0; i < listeningCallbacks->size(); i++ ) {
 			Handle<Function> fn = listeningCallbacks->at(i);
 			fn->Call( *callbackReceiver, NULL, NULL );
@@ -298,9 +314,12 @@ int main(int argc, char* argv[]) {
 	v8::Handle<v8::Context> context = v8::Context::New(NULL, global);
 	v8::Context::Scope context_scope(context);
 
-	Handle<Script> script = Script::Compile( String::New( "createServer( function( stream ){ stream.addListener( function( data ){ puts(data);} ); } ).listen( 9980, 'localhost' );") );
+	// TODO: test script is hard coded here, want to read from file
+	Handle<Script> script = Script::Compile( String::New( 
+			"createServer( function( stream ){ stream.addListener( function( data ){ puts(data);} ); } ).listen( 9980, 'localhost' );"
+	));
 	Handle<Value> scriptresult = script->Run();
 	
-	
+	// TODO: main thread should process dispatch queue
 	Thread::Sleep( Timeout::Infinite );
 }
