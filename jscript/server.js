@@ -10,8 +10,10 @@ import System.Threading;
 import System.IO;
 
 // TODO: would like to import Node.net API namespaces using require()
+import SetTimeout;
 import Http;
 import Net;
+
 
 // dispatch queue and signalling primitive for main event loop
 var manualResetEvent : ManualResetEvent = new ManualResetEvent( false );
@@ -23,6 +25,11 @@ var workItems = [];
 evalCommandlineArgument() 
 runEventLoop();
 
+function setTimeout( fn, time ) {
+	print( 'registering timeout' );
+	var timer = new NodeTimer();
+	timer.SetTimeout( fn, time );
+}
 
 // implements require() for importing js files/namespaces
 function require( file ) {

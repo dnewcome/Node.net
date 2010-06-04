@@ -18,3 +18,21 @@ net.createServer( function( stream ) {
 		print( data );
 	});
 }).listen( 9982, 'localhost' );
+
+
+setTimeout( 
+	function() {
+		// TODO: sys.puts not working here
+		print( 'timeout working' );
+		// sys.puts( 'timout working' );
+	},
+	5000 
+);
+setTimeout( 
+	function() {
+		// TODO: sys.puts not working here
+		print( 'timeout2 working' );
+		// sys.puts( 'timout working' );
+	},
+	10000 
+);
