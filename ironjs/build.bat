@@ -1,0 +1,1 @@
+csc /r:IronJS.dll server.cs netserver.cs
