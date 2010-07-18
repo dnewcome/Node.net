@@ -16,12 +16,6 @@ using IronJS.Compiler;
 using IronJS.Runtime.Js;
 using IronJS.Runtime.Utils;
 
-
-// TODO: would like to import Node.net API namespaces using require()
-// import SetTimeout;
-// import Http;
-// import Net;
-
 public class Server 
 {
 	// temp hack global
@@ -40,14 +34,7 @@ public class Server
 		instance.runEventLoop();
 	}
 	
-	/*
-	function setTimeout( fn, time ) {
-		print( 'registering timeout' );
-		var timer = new NodeTimer();
-		timer.SetTimeout( fn, time );
-	}
-	*/
-
+	// TODO: finish porting things like require()
 	// implements require() for importing js files/namespaces
 	/*
 	function require( file ) {
@@ -70,10 +57,6 @@ public class Server
 		return eval( code, 'unsafe' );
 	}
 	*/
-
-	// quick hack to add sys.puts();
-	// TODO: `sys' should be implemented in its own class
-	// var sys = { puts: function( string ){ print( string ); } };
 
 	// threadsafe enqueue function
 	public void queueWorkItem( object item ) {
@@ -127,6 +110,10 @@ public class Server
 					manualResetEvent.Reset();
 				}
 			}
+			catch( Exception e ) {
+				Console.WriteLine( e );
+				manualResetEvent.Reset();
+			}
 			finally {
 				Monitor.Exit( workItems );
 				Console.WriteLine( "event loop: released lock" );
@@ -135,7 +122,7 @@ public class Server
 			if( callback != null ) {
 				Console.WriteLine( "event loop: dispatching callback" );
 				// TODO: not sure what this callback delegate looks like yet
-				// callback.callback.Invoke( this, callback.args );
+				callback.callback.Invoke( callback.args );
 			}
 			Console.WriteLine( "event loop waiting" );
 			manualResetEvent.WaitOne();
@@ -153,25 +140,48 @@ public class Server
 
 		context.SetupGlobals(globals);
 
+		// set up 'puts' function
 		Action<object> emit = ( obj ) => { Console.WriteLine( JsTypeConverter.ToString( obj ) ); };
 		globals.Global( "puts", emit );
 		
-		Func<VarDelegate, Net.NetServer> createNetServer = ( callback ) => { Net.NetServer ns = new Net.NetServer( callback ); return ns; };
-		// Func<object, object> createNetServer = ( callback ) => { Net.NetServer ns = new Net.NetServer( callback ); return ns; };
-		globals.Global( "createNetServer ", createNetServer );		
-
+		// Forms the `net" namespace
+		net netObj = new net( context );
+		globals.Global( "net", netObj );
+		
 		compiled( globals );
-
-		// Pull reaches into js script and gets obj by name
-		// Console.WriteLine( globals.Pull( "x" ) );
-
-		}
+	}
 } // class
 
+// provides the 'net' namespace
+class net : Obj
+{
+	public net( Context context ) {
+		// have to set context to satisfy IronJS Obj
+		Context = context;
+		
+		SetOwnProperty( "createServer", new Fn_CreateServer( context ) );
+	}
+}
+
+class Fn_CreateServer : IronJS.Runtime.Js.NativeFunction
+{
+	public Fn_CreateServer( Context context ) : base( context ) {}
+
+	public override object Call( IObj that, object[] args ) {
+		Console.WriteLine( "net.createServer() called." );
+		Net.NetServer server = new Net.NetServer( ( UserFunction )args[0], Context );
+		Console.WriteLine( server );
+		return( server );
+	}
+}
+	
+// note that this encapsulates callbacks on the .net side. The dispatch queue
+// is a Queue of these.
+// We use IFunction for the js callbacks
 public class Callback 
 {
 	public VarDelegate callback;
-	public object args;
+	public object[] args;
 }
 
 public delegate void VarDelegate( params object[] args );

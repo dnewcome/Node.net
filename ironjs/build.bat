@@ -1,1 +1,1 @@
-csc /r:IronJS.dll server.cs netserver.cs
+csc /r:IronJS.dll /debug:full server.cs netserver.cs

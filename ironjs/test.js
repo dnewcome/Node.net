@@ -1,7 +1,7 @@
 puts( "working" );
 
-createNetServer( function( stream ) {
+var server = net.createServer( function( stream ) {
 	stream.addListener( 'data', function( data ) {
-		print( data );
+		puts( data );
 	});
 }).listen( 9982, 'localhost' );
