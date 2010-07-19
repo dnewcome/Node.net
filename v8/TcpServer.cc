@@ -24,8 +24,9 @@ const char* ToCString( const v8::String::Utf8Value& value ) {
   return *value ? *value : "<string conversion failed>";
 }
 
-// prototype ... 
-v8::Handle<v8::Value> addListenerCallback( const v8::Arguments& args );
+// prototypes
+v8::Handle<v8::Value> NetStreamAddListenerCallback( const v8::Arguments& args );
+System::String^ StringV8ToDotnet( Handle<v8::Value> in_string );
 
 ref class NetStream {
 private:
@@ -116,7 +117,6 @@ public:
 			// fn->Call();
 		}
 	}
-	
 };
 
 ref class NetServer {
@@ -179,7 +179,7 @@ public:
 		Handle<ObjectTemplate> streamObjTempl = ObjectTemplate::New();
 		streamObjTempl->SetInternalFieldCount(1);
 		streamObjTempl->Set( 
-			String::New( "addListener" ), FunctionTemplate::New( addListenerCallback ) 
+			String::New( "addListener" ), FunctionTemplate::New( NetStreamAddListenerCallback ) 
 		);
 		Local<v8::Object> obj = streamObjTempl->NewInstance();
 		
@@ -229,25 +229,33 @@ public:
 	}
 };
 
-// This callback is the native code associated with a v8 function.
-// Eventually all of the v8 functions that we call will come from compiled
-// scripts
+/**
+* listenCallback is installed as the c++ callback that handles calling 
+* listen() on a javascript NetServer instance.
+*/
 v8::Handle<v8::Value> listenCallback( const v8::Arguments& args ) {
 	HandleScope handle_scope;
-	printf( "called v8 listen callback\n" );
+	printf( "listenCallback()\n" );
 	
 	Local<Object> self = args.This();
 	Local<Value> p = self->GetInternalField(0);
 	Local<External> wrap = Local<External>::Cast( p );
     void* ptr = wrap->Value();
-    // NetServer value = static_cast<NetServer*>(ptr);
 	NetServer^ h = (NetServer^)(GCHandle::FromIntPtr( System::IntPtr( ptr ) ) ).Target;
-	h->Listen( 9980, "localhost" );
+	
+	System::String^ hostname = StringV8ToDotnet( args[1] );
+	int portnumber = args[0]->Int32Value();
+	
+	h->Listen( portnumber, hostname );
 	return v8::Undefined();
 }
 
 
-
+/**
+* createServerCallback handles the creation of a new NetServer.
+* the global js function `createServer' is installed in the context, and 
+* this function handles the call on the c++ side of things
+*/
 v8::Handle<v8::Value> createServerCallback( const v8::Arguments& args ) {
 	HandleScope handle_scope;
 	printf( "called v8 createServer callback\n" );		
@@ -290,22 +298,34 @@ v8::Handle<v8::Value> PutsCallback( const v8::Arguments& args ) {
 	return v8::Undefined();
 }
 
-v8::Handle<v8::Value> addListenerCallback( const v8::Arguments& args ) {
+/**
+* Convert a v8 value to a .net string
+*/
+System::String^ StringV8ToDotnet( Handle<v8::Value> in_string ) {
+	v8::String::Utf8Value str( in_string );
+	const char* cstr = ToCString( str );
+	System::String^ retstring = gcnew System::String( cstr, 0, lstrlen( cstr ) );
+	return retstring;
+}
+
+v8::Handle<v8::Value> NetStreamAddListenerCallback( const v8::Arguments& args ) {
 	HandleScope handle_scope;
-	printf( "called v8 addListenerCallback\n" );	
+	printf( "NetStreamAddListenerCallback()\n" );	
 	
-	Local<Object> self = args.This();
+	Local<v8::Object> self = args.This();
 	Local<Value> p = self->GetInternalField(0);
 	Local<External> wrap = Local<External>::Cast( p );
     void* ptr = wrap->Value();
 	NetStream^ h = (NetStream^)(GCHandle::FromIntPtr( System::IntPtr( ptr ) ) ).Target;
 	
-	Persistent<Function> fn = Persistent<Function>::New( Handle<Function>::Cast( args[0] ) );
+	System::String^ eventType = StringV8ToDotnet( args[0] );
+	
+	Persistent<Function> fn = Persistent<Function>::New( Handle<Function>::Cast( args[1] ) );
 	
 	// note we have listener type hard coded
-	h->addListener( "data", fn );
+	h->addListener( eventType, fn );
 	return v8::Undefined();
-}
+}	
 
 int main(int argc, char* argv[]) {
 	printf("%s\n", "entered main()" );
@@ -324,7 +344,7 @@ int main(int argc, char* argv[]) {
 
 	// TODO: test script is hard coded here, want to read from file
 	Handle<Script> script = Script::Compile( String::New( 
-			"createServer( function( stream ){ stream.addListener( function( data ){ puts(data);} ); } ).listen( 9980, 'localhost' );"
+			"createServer( function( stream ){ stream.addListener( 'data', function( data ){ puts(data);} ); } ).listen( 9980, 'localhost' );"
 	));
 	Handle<Value> scriptresult = script->Run();
 	
