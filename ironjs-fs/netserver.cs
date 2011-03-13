@@ -83,6 +83,7 @@ namespace Net
 			this.stream.Close();
 		}
 		public void addListener( string eventname, IronJS.Function callback ) {
+			Console.WriteLine( "NetStream: adding listener: " + eventname );
 			if( eventname == "data" ) {
 				dataCallbacks.Add( callback );
 			}
@@ -97,9 +98,11 @@ namespace Net
 			for( var i=0; i < dataCallbacks.Count; i++ ) {
 				// ( ( IronJS.Function )dataCallbacks[i] ).Call( this, new object[] { chunk } );
 				IronJS.Function func = ( IronJS.Function )dataCallbacks[i];
-				Action<IronJS.Function,IronJS.Object,object[]> fun = 
-					func.Compiler.compileAs<Action<IronJS.Function,IronJS.Object,object[]>>(func);
-				fun.Invoke(func, func.Env.Globals, new object[] {chunk} );
+				Action<IronJS.Function,IronJS.Object,string> fun = 
+					func.Compiler.compileAs<Action<IronJS.Function,IronJS.Object,string>>(func);
+				// fun.Invoke(func, func.Env.Globals, new object[] {chunk} );
+				Console.WriteLine( "invoking JS raiseDataEvent callback" );
+				fun.Invoke(func, this, chunk );
 			}
 		}
 		
@@ -183,15 +186,15 @@ namespace Net
 		
 		public void raiseConnectionEvent( object[] args ) {
 			NetStream stream = ( NetStream )args[0];
-			Console.WriteLine( "http.server.raiseConnectionEvent()" );
 			Console.WriteLine( "http.server.raiseConnectionEvent() - calling " + connectionCallbacks.Count + " callbacks" );
 			
 			foreach( object callback in connectionCallbacks ) {
+				Console.WriteLine( "calling js function callback" );
 				// ( ( IFunction )callback ).Call( this, new object[] { stream } );
 				IronJS.Function func = ( IronJS.Function )callback;
-				Action<IronJS.Function,IronJS.Object,object[]> fun = 
-					func.Compiler.compileAs<Action<IronJS.Function,IronJS.Object,object[]>>(func);
-				fun.Invoke(func, func.Env.Globals, new object[] { stream } );
+				Action<IronJS.Function,IronJS.Object,IronJS.Object> fun = 
+					func.Compiler.compileAs<Action<IronJS.Function,IronJS.Object,IronJS.Object>>(func);
+				fun.Invoke(func, this, stream );
 
 			}
 		}
