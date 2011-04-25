@@ -1,0 +1,1 @@
+C:\Windows\Microsoft.NET\Framework\v2.0.50727\jsc /fast- /out:httpparsertest.exe httpparser.js tests.js
