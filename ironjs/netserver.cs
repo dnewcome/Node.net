@@ -53,7 +53,7 @@ namespace Net
 			
 			if( bytesRead > 0 ) {
 				// queue work before calling another read, could be out of order otw
-				Server.instance.queueWorkItem( new Callback() { callback = raiseDataEvent, args = new object[] { chunk } } );
+				Server.instance.queueWorkItem( new Callback() { name = "stream:raiseDataEvent", callback = raiseDataEvent, args = new object[] { chunk } } );
 				byte[] nextBuffer = new byte[ bufferSize ];
 				this.stream.BeginRead( nextBuffer, 0, bufferSize, ReadCallback, nextBuffer );
 			}
@@ -62,7 +62,7 @@ namespace Net
 				// remote end of socket, not sure if raising "end" when there
 				// is no more data is the right thing to do. It does the right thing
 				// when using Telnet as the client 
-				Server.instance.queueWorkItem( new Callback() { callback = raiseEndEvent, args = new object[]{} } );
+				Server.instance.queueWorkItem( new Callback() { name = "stream:raiseEndEvent", callback = raiseEndEvent, args = new object[]{} } );
 			}
 		}
 
@@ -72,6 +72,9 @@ namespace Net
 			this.stream.Write( buffer, 0, buffer.Length );
 		}
 		
+		public void end() { 
+			this.stream.Close();
+		}
 		public void addListener( string eventname, IFunction callback ) {
 			if( eventname == "data" ) {
 				dataCallbacks.Add( callback );

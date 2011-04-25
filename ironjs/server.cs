@@ -60,13 +60,14 @@ public class Server
 
 	// threadsafe enqueue function
 	public void queueWorkItem( object item ) {
-			Console.WriteLine( "queueWorkItem(): queuing item: " + item );
+			Console.WriteLine( "queueWorkItem(): queuing item: " + ((Callback)item).name );
 			Console.WriteLine( "queueWorkItem(): acquiring lock: " + workItems );
 		Monitor.Enter( workItems );
 		try {
 			workItems.Enqueue( item );
 			Console.WriteLine( "queueWorkItem(): item queued" );
 			manualResetEvent.Set();
+			Console.WriteLine( "queueWorkItem(): queue set to runnable" );
 		}
 		finally {
 			Monitor.Exit( workItems );
@@ -120,7 +121,9 @@ public class Server
 			}
 			
 			if( callback != null ) {
-				Console.WriteLine( "event loop: dispatching callback" );
+				Console.WriteLine( "event loop: dispatching callback: " + callback.name );
+				Console.WriteLine( "event loop: dispatching callback: " + callback.callback );
+				Console.WriteLine( "event loop: dispatching args: " + callback.args );
 				// TODO: not sure what this callback delegate looks like yet
 				callback.callback.Invoke( callback.args );
 			}
@@ -148,6 +151,10 @@ public class Server
 		net netObj = new net( context );
 		globals.Global( "net", netObj );
 		
+		// Forms the `net" namespace
+		http httpObj = new http( context );
+		globals.Global( "http", httpObj );
+
 		compiled( globals );
 	}
 } // class
@@ -175,11 +182,34 @@ class Fn_CreateServer : IronJS.Runtime.Js.NativeFunction
 	}
 }
 	
+// provides the 'http' namespace
+class http : Obj
+{
+	public http( Context context ) {
+		// have to set context to satisfy IronJS Obj
+		Context = context;
+		
+		SetOwnProperty( "createServer", new Fn_CreateHttpServer( context ) );
+	}
+}
+
+class Fn_CreateHttpServer : IronJS.Runtime.Js.NativeFunction
+{
+	public Fn_CreateHttpServer( Context context ) : base( context ) {}
+
+	public override object Call( IObj that, object[] args ) {
+		Console.WriteLine( "http.createServer() called." );
+		Http.HttpServer server = new Http.HttpServer( ( UserFunction )args[0], Context );
+		Console.WriteLine( server );
+		return( server );
+	}
+}
 // note that this encapsulates callbacks on the .net side. The dispatch queue
 // is a Queue of these.
 // We use IFunction for the js callbacks
 public class Callback 
 {
+	public string name = "";
 	public VarDelegate callback;
 	public object[] args;
 }
