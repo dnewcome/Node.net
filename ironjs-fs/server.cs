@@ -144,10 +144,9 @@ public class Server
 		ctx.PutGlobal( "net", netObj );
 		
 		// Forms the `http" namespace
-		/*
 		http httpObj = new http( ctx.Environment );
 		ctx.PutGlobal( "http", httpObj );
-		*/
+	
 		ctx.ExecuteFile( in_filename );
 	}
 } // class
@@ -176,29 +175,26 @@ class net : IronJS.Object
 }
 	
 // provides the 'http' namespace
-/**
 class http : IronJS.Object
 {
-	public http( IronJS.Hosting.Context context ) {
+	public http( IronJS.Environment env ) : base( env, env.Maps.Base, env.Prototypes.Object, IronJS.Classes.Object ) {
 		// have to set context to satisfy IronJS Obj
-		Context = context;
+		Env = env;
+		Methods = Env.Methods.Object;
 		
-		SetOwnProperty( "createServer", new Fn_CreateHttpServer( context ) );
+		// SetOwnProperty( "createServer", new Fn_CreateHttpServer( context ) );
+		var objMethod = IronJS.Api.HostFunction.create<Func<IronJS.Function, IronJS.Object>>(Env, CreateServer);
+		Console.WriteLine( this.Methods == null );
+		Console.WriteLine( objMethod );
+        this.Methods.PutRefProperty(this, "createServer", objMethod, IronJS.TypeTags.Function);
 	}
-}
-
-class Fn_CreateHttpServer : IronJS.Function
-{
-	public Fn_CreateHttpServer( IronJS.Hosting.Context context ) : base( context ) {}
-
-	public object Call( IronJS.Object that, object[] args ) {
+	public IronJS.Object CreateServer( IronJS.Function callback ) {
 		Console.WriteLine( "http.createServer() called." );
-		Http.HttpServer server = new Http.HttpServer( ( UserFunction )args[0], Context );
+		Http.HttpServer server = new Http.HttpServer( callback, Env );
 		Console.WriteLine( server );
 		return( server );
 	}
 }
-*/
 
 // note that this encapsulates callbacks on the .net side. The dispatch queue
 // is a Queue of these.

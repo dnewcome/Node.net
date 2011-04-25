@@ -17,7 +17,9 @@ namespace Net
 {
 	public class NetStream : IronJS.Object
 	{
-		Stream stream;
+		// XXX making stream public to work around incomplete design - fix this
+		public Stream stream;
+
 		// TODO: callbacks will be JS functions, should probably use 
 		// List<IFunction>
 		ArrayList dataCallbacks = new ArrayList();
@@ -79,7 +81,8 @@ namespace Net
 			this.stream.Write( buffer, 0, buffer.Length );
 		}
 		
-		public void end() { 
+		public void end() {
+            Console.WriteLine( "closing stream" );
 			this.stream.Close();
 		}
 		public void addListener( string eventname, IronJS.Function callback ) {
