@@ -1,1 +1,11 @@
-csc /r:IronJS.dll /r:IronJS.Runtime.dll /r:http_parser.dll /debug:full netserver.cs httpserver.cs server.cs
+csc ^
+	/r:lib\IronJS.dll ^
+	/r:lib\IronJS.Runtime.dll ^
+	/r:lib\http_parser.dll ^
+	/debug:full ^
+	/out:bin\node.exe ^
+	netserver.cs ^
+	httpserver.cs ^
+	server.cs 
+
+copy lib\*.dll bin
