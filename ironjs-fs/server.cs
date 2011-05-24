@@ -23,6 +23,12 @@ public class Server
 	private ManualResetEvent manualResetEvent = new ManualResetEvent( false );
 	private Queue workItems = new Queue();
 
+	// JS execution context used for all JS code
+	private static IronJS.Hosting.Context ctx = IronJS.Hosting.Context.Create();
+
+	private static net netObj = new net( ctx.Environment );
+	private static http httpObj = new http( ctx.Environment );
+
 	public static void Main() {
 		// eval js file given as first commandline arg and 
 		// run the event loop - runEventLoop() always blocks, unlike node.js
@@ -34,27 +40,29 @@ public class Server
 	
 	// TODO: finish porting things like require()
 	// implements require() for importing js files/namespaces
-	/*
-	function require( file ) {
+	public static IronJS.Object Require( string file ) {
 		// for compiled-in functionality, return existing references.
 		// TODO: clean up the global namespace, `http' et al. are directly visible
-		if( file == 'http' ) {
-			return http;
+		if( file == "http" ) {
+			return httpObj;
 		}
-		if( file == 'net' ) {
-			return net;
+		if( file == "net" ) {
+			return netObj;
 		}
-		if( file == 'sys' ) {
+		/*
+		if( file == "sys" ) {
 			return sys;
 		}
-		print( 'requiring: ' + file );
-		var fileContents = readFile( file + '.js' );
+		*/
+
+		Console.WriteLine( "requiring: " + file );
+		FileStream fs = new FileStream( file + ".js", FileMode.Open, FileAccess.Read );
+		string code = new StreamReader( fs ).ReadToEnd();
 		// extra semicolon provided after file contents.. just in case
-		var code = 'var exports = {}; ' + fileContents + '; exports;';
-		print( 'evaluating require: ' + code );
-		return eval( code, 'unsafe' );
+		code = "var exports = {}; " + code + "; exports;";
+		// print( "evaluating require: " + code );
+		return ctx.ExecuteT<IronJS.Object>( code );
 	}
-	*/
 
 	// threadsafe enqueue function
 	public void queueWorkItem( object item ) {
@@ -131,20 +139,29 @@ public class Server
 	}
 	
 	public void ReadJsFile( string in_filename ) {
-		IronJS.Hosting.Context ctx = IronJS.Hosting.Context.Create();
 		
 		// set up 'puts' function
         // Action<object> emit = ( obj ) => { Console.WriteLine( JsTypeConverter.ToString( obj ) ); };
 		var emit =
-           IronJS.Api.HostFunction.create<Action<IronJS.Box>>( ctx.Environment, ( obj ) => { Console.WriteLine(IronJS.Api.TypeConverter.toString(obj) ); } );
-        ctx.PutGlobal("puts", emit );
+		IronJS.Api.HostFunction.create<Action<IronJS.Box>>( 
+			ctx.Environment, ( obj ) => { 
+				Console.WriteLine(IronJS.Api.TypeConverter.toString(obj) ); 
+			} 
+		);
+		ctx.PutGlobal("puts", emit );
 		
+		var require =
+		IronJS.Api.HostFunction.create<Func<string,IronJS.Object>>( 
+			ctx.Environment, ( obj ) => { 
+				return Require( obj );
+			} 
+		);
+		ctx.PutGlobal("require", require );
+
 		// Forms the `net" namespace
-		net netObj = new net( ctx.Environment );
 		ctx.PutGlobal( "net", netObj );
 		
 		// Forms the `http" namespace
-		http httpObj = new http( ctx.Environment );
 		ctx.PutGlobal( "http", httpObj );
 	
 		ctx.ExecuteFile( in_filename );
