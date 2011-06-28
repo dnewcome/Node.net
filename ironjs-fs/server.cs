@@ -10,6 +10,7 @@ using System.Threading;
 using System.IO;
 using System.Text;
 using System.Collections;
+using System.Collections.Generic;
 using System;
 using IronJS;
 using IronJS.Native;
@@ -24,10 +25,14 @@ public class Server
 	private Queue workItems = new Queue();
 
 	// JS execution context used for all JS code
-	private static IronJS.Hosting.Context ctx = IronJS.Hosting.Context.Create();
+	private static IronJS.Hosting.CSharp.Context ctx = new IronJS.Hosting.CSharp.Context();
 
 	private static net netObj = new net( ctx.Environment );
-	private static http httpObj = new http( ctx.Environment );
+	// TODO: re-add after httpserver.cs is converted to IJS 0.2
+	// private static http httpObj = new http( ctx.Environment );
+
+	// path of current js file
+	private static string path = "";
 
 	public static void Main() {
 		// eval js file given as first commandline arg and 
@@ -37,14 +42,23 @@ public class Server
 		instance.evalCommandlineArgument();
 		instance.runEventLoop();
 	}
-	
+
+	private static List<string> requireStack = new List<string>();
+
 	// TODO: finish porting things like require()
 	// implements require() for importing js files/namespaces
-	public static IronJS.Object Require( string file ) {
+	public static IronJS.CommonObject Require( string file ) {
+
+		string pathpart = Path.GetDirectoryName( file );
+		path = Directory.GetCurrentDirectory() + pathpart;
+		string filename = Path.GetFileName( file );
+		Console.WriteLine( "require() path of js file: " + path );
+
 		// for compiled-in functionality, return existing references.
 		// TODO: clean up the global namespace, `http' et al. are directly visible
 		if( file == "http" ) {
-			return httpObj;
+			// TODO: re-add after httpserver.cs is converted to IJS 0.2
+			// return httpObj;
 		}
 		if( file == "net" ) {
 			return netObj;
@@ -56,12 +70,24 @@ public class Server
 		*/
 
 		Console.WriteLine( "requiring: " + file );
-		FileStream fs = new FileStream( file + ".js", FileMode.Open, FileAccess.Read );
+		FileStream fs;
+		string filepath;
+		try {
+			filepath = path + "\\" + filename + ".js";
+			Console.WriteLine( "full file name: " + filepath );
+			fs = new FileStream( filepath, FileMode.Open, FileAccess.Read );
+		}
+		catch {
+			filepath = path + "\\node_modules\\" + filename + "\\index.js";
+			Console.WriteLine( "full file name: " + filepath );
+			fs = new FileStream( path + "\\node_modules\\" + file + "\\index.js", FileMode.Open, FileAccess.Read );
+		}
+
 		string code = new StreamReader( fs ).ReadToEnd();
 		// extra semicolon provided after file contents.. just in case
 		code = "var exports = {}; " + code + "; exports;";
 		// print( "evaluating require: " + code );
-		return ctx.ExecuteT<IronJS.Object>( code );
+		return ctx.Execute<IronJS.CommonObject>( code );
 	}
 
 	// threadsafe enqueue function
@@ -139,51 +165,57 @@ public class Server
 	}
 	
 	public void ReadJsFile( string in_filename ) {
-		
+
+		string pathpart = Path.GetDirectoryName( in_filename );
+		path = Directory.GetCurrentDirectory() + pathpart;
+		Console.WriteLine( "path of js file: " + path );
+
 		// set up 'puts' function
         // Action<object> emit = ( obj ) => { Console.WriteLine( JsTypeConverter.ToString( obj ) ); };
 		var emit =
-		IronJS.Api.HostFunction.create<Action<IronJS.Box>>( 
+		Utils.createHostFunction<Action<IronJS.BoxedValue>>( 
 			ctx.Environment, ( obj ) => { 
-				Console.WriteLine(IronJS.Api.TypeConverter.toString(obj) ); 
+				Console.WriteLine(IronJS.TypeConverter.ToString(obj) ); 
 			} 
 		);
-		ctx.PutGlobal("puts", emit );
+		// ctx.PutGlobal("puts", emit );
+		ctx.SetGlobal<IronJS.FunctionObject>( "puts", emit );
 		
 		var require =
-		IronJS.Api.HostFunction.create<Func<string,IronJS.Object>>( 
+		Utils.createHostFunction<Func<string,IronJS.CommonObject>>( 
 			ctx.Environment, ( obj ) => { 
 				return Require( obj );
 			} 
 		);
-		ctx.PutGlobal("require", require );
+		ctx.SetGlobal<IronJS.FunctionObject>("require", require );
 
 		// Forms the `net" namespace
-		ctx.PutGlobal( "net", netObj );
+		ctx.SetGlobal<IronJS.CommonObject>( "net", netObj );
 		
 		// Forms the `http" namespace
-		ctx.PutGlobal( "http", httpObj );
+		// TODO: re-add after httpserver.cs is converted to IJS 0.2
+		// ctx.SetGlobal<IronJS.CommonObject>( "http", httpObj );
 	
 		ctx.ExecuteFile( in_filename );
 	}
 } // class
 
 // provides the 'net' namespace
-class net : IronJS.Object
+class net : IronJS.CommonObject
 {
-	public net( IronJS.Environment env ) : base( env, env.Maps.Base, env.Prototypes.Object, IronJS.Classes.Object ) {
+	public net( IronJS.Environment env ) : base( env, env.Maps.Base, env.Prototypes.Object ) {
 		// have to set context to satisfy IronJS Obj
-		Env = env;
-		Methods = Env.Methods.Object;
+		// Env = env;
+		// Methods = Env.Methods.Object;
 		
 		// SetOwnProperty( "createServer", new Fn_CreateServer( context ) );
-		var objMethod = IronJS.Api.HostFunction.create<Func<IronJS.Function, IronJS.Object>>(Env, CreateServer);
-		Console.WriteLine( this.Methods == null );
+		var objMethod = Utils.createHostFunction<Func<IronJS.FunctionObject, IronJS.CommonObject>>(Env, CreateServer);
 		Console.WriteLine( objMethod );
-        this.Methods.PutRefProperty(this, "createServer", objMethod, IronJS.TypeTags.Function);
+        // this.Methods.PutRefProperty(this, "createServer", objMethod, IronJS.TypeTags.Function);
+		this.Put( "createServer", objMethod );
 	}
 	
-	public IronJS.Object CreateServer( IronJS.Function callback ) {
+	public IronJS.CommonObject CreateServer( IronJS.FunctionObject callback ) {
 		Console.WriteLine( "net.createServer() called." );
 		Net.NetServer server = new Net.NetServer( callback, Env );
 		Console.WriteLine( server );
@@ -192,26 +224,28 @@ class net : IronJS.Object
 }
 	
 // provides the 'http' namespace
-class http : IronJS.Object
+/** TODO: re-add after httpserver.cs is converted to IJS 0.2
+class http : IronJS.CommonObject
 {
-	public http( IronJS.Environment env ) : base( env, env.Maps.Base, env.Prototypes.Object, IronJS.Classes.Object ) {
+	public http( IronJS.Environment env ) : base( env, env.Maps.Base, env.Prototypes.Object ) {
 		// have to set context to satisfy IronJS Obj
-		Env = env;
-		Methods = Env.Methods.Object;
+		// Env = env;
+		// Methods = Env.Methods.Object;
 		
 		// SetOwnProperty( "createServer", new Fn_CreateHttpServer( context ) );
-		var objMethod = IronJS.Api.HostFunction.create<Func<IronJS.Function, IronJS.Object>>(Env, CreateServer);
-		Console.WriteLine( this.Methods == null );
+		var objMethod = Utils.createHostFunction<Func<IronJS.FunctionObject, IronJS.CommonObject>>(Env, CreateServer);
 		Console.WriteLine( objMethod );
-        this.Methods.PutRefProperty(this, "createServer", objMethod, IronJS.TypeTags.Function);
+        // this.Methods.PutRefProperty(this, "createServer", objMethod, IronJS.TypeTags.Function);
+		this.Put( "createServer", objMethod );
 	}
-	public IronJS.Object CreateServer( IronJS.Function callback ) {
+	public IronJS.CommonObject CreateServer( IronJS.FunctionObject callback ) {
 		Console.WriteLine( "http.createServer() called." );
 		Http.HttpServer server = new Http.HttpServer( callback, Env );
 		Console.WriteLine( server );
 		return( server );
 	}
 }
+*/
 
 // note that this encapsulates callbacks on the .net side. The dispatch queue
 // is a Queue of these.

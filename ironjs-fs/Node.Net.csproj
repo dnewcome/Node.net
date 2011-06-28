@@ -16,7 +16,7 @@
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x86' ">
-    <PlatformTarget>x86</PlatformTarget>
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
@@ -38,11 +38,9 @@
     <Reference Include="http_parser">
       <HintPath>lib\http_parser.dll</HintPath>
     </Reference>
-    <Reference Include="IronJS">
-      <HintPath>lib\IronJS.dll</HintPath>
-    </Reference>
-    <Reference Include="IronJS.Runtime">
-      <HintPath>lib\IronJS.Runtime.dll</HintPath>
+    <Reference Include="IronJS, Version=0.2.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>lib\ironjs-0.2-clr4-x64\IronJS.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -53,7 +51,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="httpserver.cs" />
     <Compile Include="netserver.cs" />
     <Compile Include="server.cs" />
   </ItemGroup>
