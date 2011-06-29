@@ -229,4 +229,25 @@ namespace Net
 			}
 		}
 	} // class
+
+	// provides the 'net' namespace
+	// TODO: rename this class 
+	class net : IronJS.CommonObject
+	{
+		public net( IronJS.Environment env )
+			: base( env, env.Maps.Base, env.Prototypes.Object ) {
+
+			var objMethod = Utils.createHostFunction<Func<IronJS.FunctionObject, IronJS.CommonObject>>( Env, CreateServer );
+			Console.WriteLine( objMethod );
+			this.Put( "createServer", objMethod );
+		}
+
+		public IronJS.CommonObject CreateServer( IronJS.FunctionObject callback ) {
+			Console.WriteLine( "net.createServer() called." );
+			Net.NetServer server = new Net.NetServer( callback, Env );
+			Console.WriteLine( server );
+			return ( server );
+		}
+	}
+
 } // package

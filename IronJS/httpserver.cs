@@ -209,4 +209,23 @@ namespace Http
 		}
 	} // class
 
+	// provides the 'http' namespace
+	// TODO: rename this class?
+	class http : IronJS.CommonObject
+	{
+		public http( IronJS.Environment env ) : base( env, env.Maps.Base, env.Prototypes.Object ) {
+			// SetOwnProperty( "createServer", new Fn_CreateHttpServer( context ) );
+			var objMethod = Utils.createHostFunction<Func<IronJS.FunctionObject, IronJS.CommonObject>>(Env, CreateServer);
+			Console.WriteLine( objMethod );
+			// this.Methods.PutRefProperty(this, "createServer", objMethod, IronJS.TypeTags.Function);
+			this.Put( "createServer", objMethod );
+		}
+		public IronJS.CommonObject CreateServer( IronJS.FunctionObject callback ) {
+			Console.WriteLine( "http.createServer() called." );
+			Http.HttpServer server = new Http.HttpServer( callback, Env );
+			Console.WriteLine( server );
+			return( server );
+		}
+	}
+
 } // package

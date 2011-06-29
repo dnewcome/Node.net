@@ -27,7 +27,7 @@ public class Server
 	// JS execution context used for all JS code
 	private static IronJS.Hosting.CSharp.Context ctx = new IronJS.Hosting.CSharp.Context();
 
-	private static net netObj = new net( ctx.Environment );
+	private static Net.net netObj = new Net.net( ctx.Environment );
 	// TODO: re-add after httpserver.cs is converted to IJS 0.2
 	// private static http httpObj = new http( ctx.Environment );
 
@@ -194,48 +194,6 @@ public class Server
 		ctx.ExecuteFile( in_filename );
 	}
 } // class
-
-// provides the 'net' namespace
-class net : IronJS.CommonObject
-{
-	public net( IronJS.Environment env ) : base( env, env.Maps.Base, env.Prototypes.Object ) {
-		
-		var objMethod = Utils.createHostFunction<Func<IronJS.FunctionObject, IronJS.CommonObject>>(Env, CreateServer);
-		Console.WriteLine( objMethod );
-		this.Put( "createServer", objMethod );
-	}
-	
-	public IronJS.CommonObject CreateServer( IronJS.FunctionObject callback ) {
-		Console.WriteLine( "net.createServer() called." );
-		Net.NetServer server = new Net.NetServer( callback, Env );
-		Console.WriteLine( server );
-		return( server );
-	}
-}
-	
-// provides the 'http' namespace
-/** TODO: re-add after httpserver.cs is converted to IJS 0.2
-class http : IronJS.CommonObject
-{
-	public http( IronJS.Environment env ) : base( env, env.Maps.Base, env.Prototypes.Object ) {
-		// have to set context to satisfy IronJS Obj
-		// Env = env;
-		// Methods = Env.Methods.Object;
-		
-		// SetOwnProperty( "createServer", new Fn_CreateHttpServer( context ) );
-		var objMethod = Utils.createHostFunction<Func<IronJS.FunctionObject, IronJS.CommonObject>>(Env, CreateServer);
-		Console.WriteLine( objMethod );
-        // this.Methods.PutRefProperty(this, "createServer", objMethod, IronJS.TypeTags.Function);
-		this.Put( "createServer", objMethod );
-	}
-	public IronJS.CommonObject CreateServer( IronJS.FunctionObject callback ) {
-		Console.WriteLine( "http.createServer() called." );
-		Http.HttpServer server = new Http.HttpServer( callback, Env );
-		Console.WriteLine( server );
-		return( server );
-	}
-}
-*/
 
 // note that this encapsulates callbacks on the .net side. The dispatch queue
 // is a Queue of these.
