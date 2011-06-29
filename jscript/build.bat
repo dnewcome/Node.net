@@ -1,1 +1,0 @@
-C:\Windows\Microsoft.NET\Framework\v2.0.50727\jsc /out:node.exe server.js httpserver.js netserver.js settimeout.js

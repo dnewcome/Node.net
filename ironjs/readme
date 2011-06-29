@@ -1,7 +1,0 @@
-building the IronJS port requires a slight change to 
-IronJS.
-
-Antlr3.Runtime.dll
-Microsoft.Dynamic.dll
-Microsoft.Scripting.dll
-IronJS.dll 

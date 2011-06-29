@@ -1,8 +1,0 @@
-this v8 experiment was started on may 8 the day I released the node.net jscript 
-version of node.net. 
-
-There was a comment that this could be done with a mixed mode .net assembly too
-.. well here is a start.
-
-v8.lib must be present in order to build node.net, and headers for v8 must be
-present.
