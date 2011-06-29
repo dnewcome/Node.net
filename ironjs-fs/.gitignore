@@ -1,0 +1,5 @@
+/bin/
+/obj/
+/_ReSharper.Node.Net/
+/*.csproj.user
+/*.suo

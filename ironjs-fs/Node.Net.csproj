@@ -38,9 +38,9 @@
     <Reference Include="http_parser">
       <HintPath>lib\http_parser.dll</HintPath>
     </Reference>
-    <Reference Include="IronJS, Version=0.2.0.0, Culture=neutral, processorArchitecture=AMD64">
+    <Reference Include="IronJS">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>lib\ironjs-0.2-clr4-x64\IronJS.dll</HintPath>
+      <HintPath>lib\IronJS.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -51,14 +51,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="httpserver.cs" />
     <Compile Include="netserver.cs" />
     <Compile Include="server.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Properties\" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="app.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
