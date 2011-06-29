@@ -35,12 +35,13 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="http_parser">
-      <HintPath>lib\http_parser.dll</HintPath>
+    <Reference Include="http_parser, Version=0.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\lib\http_parser.dll</HintPath>
     </Reference>
     <Reference Include="IronJS, Version=0.2.0.0, Culture=neutral, processorArchitecture=AMD64">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>lib\ironjs-0.2-clr4-x64\IronJS.dll</HintPath>
+      <HintPath>..\lib\ironjs-0.2-clr4-x64\IronJS.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
