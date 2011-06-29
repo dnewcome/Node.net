@@ -45,7 +45,6 @@ public class Server
 
 	private static List<string> requireStack = new List<string>();
 
-	// TODO: finish porting things like require()
 	// implements require() for importing js files/namespaces
 	public static IronJS.CommonObject Require( string file ) {
 
@@ -86,7 +85,6 @@ public class Server
 		string code = new StreamReader( fs ).ReadToEnd();
 		// extra semicolon provided after file contents.. just in case
 		code = "var exports = {}; " + code + "; exports;";
-		// print( "evaluating require: " + code );
 		return ctx.Execute<IronJS.CommonObject>( code );
 	}
 
@@ -170,15 +168,12 @@ public class Server
 		path = Directory.GetCurrentDirectory() + pathpart;
 		Console.WriteLine( "path of js file: " + path );
 
-		// set up 'puts' function
-        // Action<object> emit = ( obj ) => { Console.WriteLine( JsTypeConverter.ToString( obj ) ); };
 		var emit =
 		Utils.createHostFunction<Action<IronJS.BoxedValue>>( 
 			ctx.Environment, ( obj ) => { 
 				Console.WriteLine(IronJS.TypeConverter.ToString(obj) ); 
 			} 
 		);
-		// ctx.PutGlobal("puts", emit );
 		ctx.SetGlobal<IronJS.FunctionObject>( "puts", emit );
 		
 		var require =
@@ -204,14 +199,9 @@ public class Server
 class net : IronJS.CommonObject
 {
 	public net( IronJS.Environment env ) : base( env, env.Maps.Base, env.Prototypes.Object ) {
-		// have to set context to satisfy IronJS Obj
-		// Env = env;
-		// Methods = Env.Methods.Object;
 		
-		// SetOwnProperty( "createServer", new Fn_CreateServer( context ) );
 		var objMethod = Utils.createHostFunction<Func<IronJS.FunctionObject, IronJS.CommonObject>>(Env, CreateServer);
 		Console.WriteLine( objMethod );
-        // this.Methods.PutRefProperty(this, "createServer", objMethod, IronJS.TypeTags.Function);
 		this.Put( "createServer", objMethod );
 	}
 	
