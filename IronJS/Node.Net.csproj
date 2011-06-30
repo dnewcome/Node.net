@@ -52,9 +52,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Config.cs" />
+    <Compile Include="EventEmitter.cs" />
     <Compile Include="log.cs" />
     <Compile Include="netserver.cs" />
     <Compile Include="commonjs.cs" />
+    <Compile Include="NetStream.cs" />
     <Compile Include="server.cs" />
   </ItemGroup>
   <ItemGroup>
