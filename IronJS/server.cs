@@ -15,194 +15,201 @@ using System;
 using IronJS;
 using IronJS.Native;
 
-public class Server 
+namespace Node.Net
 {
-	// temp hack global
-	public static Server instance;
-	
-	// dispatch queue and signalling primitive for main event loop
-	private ManualResetEvent manualResetEvent = new ManualResetEvent( false );
-	private Queue workItems = new Queue();
+	public class Server
+	{
+		// temp hack global used to access event queue
+		// by other modules
+		public static Server instance;
 
-	// JS execution context used for all JS code
-	private static IronJS.Hosting.CSharp.Context ctx = new IronJS.Hosting.CSharp.Context();
+		// number of registered callbacks active
+		public int Listeners = 0;
 
-	private static Net.net netObj = new Net.net( ctx.Environment );
-	// TODO: re-add after httpserver.cs is converted to IJS 0.2
-	// private static http httpObj = new http( ctx.Environment );
+		// dispatch queue and signalling primitive for main event loop
+		private ManualResetEvent manualResetEvent = new ManualResetEvent( false );
+		private Queue workItems = new Queue();
 
-	// path of current js file
-	private static string path = "";
+		// toplevel JS execution context used for all JS code
+		private static IronJS.Hosting.CSharp.Context ctx = new IronJS.Hosting.CSharp.Context();
 
-	public static void Main() {
-		// eval js file given as first commandline arg and 
-		// run the event loop - runEventLoop() always blocks, unlike node.js
-		// which returns if no more callbacks are registered
-		instance = new Server();
-		instance.evalCommandlineArgument();
-		instance.runEventLoop();
-	}
+		private static Node.Net.net netObj = new Net.net( ctx.Environment );
+		// TODO: re-add after httpserver.cs is converted to IJS 0.2
+		// private static http httpObj = new http( ctx.Environment );
 
-	private static List<string> requireStack = new List<string>();
-
-	// implements require() for importing js files/namespaces
-	public static IronJS.CommonObject Require( string file ) {
-
-		string pathpart = Path.GetDirectoryName( file );
-		path = Directory.GetCurrentDirectory() + pathpart;
-		string filename = Path.GetFileName( file );
-		Console.WriteLine( "require() path of js file: " + path );
-
-		// for compiled-in functionality, return existing references.
-		// TODO: clean up the global namespace, `http' et al. are directly visible
-		if( file == "http" ) {
-			// TODO: re-add after httpserver.cs is converted to IJS 0.2
-			// return httpObj;
+		public static void Main() {
+			// eval js file given as first commandline arg and 
+			// run the event loop - runEventLoop() always blocks, unlike node.js
+			// which returns if no more callbacks are registered
+			instance = new Server();
+			instance.evalCommandlineArgument();
+			instance.runEventLoop();
 		}
-		if( file == "net" ) {
-			return netObj;
-		}
-		/*
-		if( file == "sys" ) {
-			return sys;
-		}
-		*/
 
-		Console.WriteLine( "requiring: " + file );
-		FileStream fs;
-		string filepath;
-		try {
-			filepath = path + "\\" + filename + ".js";
-			Console.WriteLine( "full file name: " + filepath );
+		private static List<string> requireStack = new List<string>();
+
+		/**
+		 * implements require() for importing js files/namespaces
+		 * 
+		 * file - the literal expression passed to require() in js.
+		 * Might be abs or rel path + filename.
+		 */
+		public static IronJS.CommonObject Require( string file ) {
+			// TODO: could possibly break this by doing require('undefined');
+			if( String.IsNullOrWhiteSpace( file ) || String.IsNullOrEmpty( file ) || file == "undefined" ) {
+				throw new Exception( "invalid file spec passed to require()" );
+			}
+
+			// for compiled-in functionality, return existing references.
+			// TODO: clean up the global namespace, `http' et al. are directly visible
+			if( file == "http" ) {
+				// TODO: re-add after httpserver.cs is converted to IJS 0.2
+				// return httpObj;
+			}
+			if( file == "net" ) {
+				return netObj;
+			}
+		
+			// otherwise invoke CommonJS search rules
+			commonjs.SetRequireStack( file );
+			string filename = Path.GetFileName( file );
+
+			FileStream fs;
+			string filepath = commonjs.FindFile( filename );
 			fs = new FileStream( filepath, FileMode.Open, FileAccess.Read );
-		}
-		catch {
-			filepath = path + "\\node_modules\\" + filename + "\\index.js";
-			Console.WriteLine( "full file name: " + filepath );
-			fs = new FileStream( path + "\\node_modules\\" + file + "\\index.js", FileMode.Open, FileAccess.Read );
+		
+			string code = new StreamReader( fs ).ReadToEnd();
+			// extra semicolon provided after file contents.. just in case
+			code = "var exports = {}; " + code + "; exports;";
+			IronJS.CommonObject retval = ctx.Execute<IronJS.CommonObject>( code );
+			commonjs.RequireStack.Pop();
+			return retval;
 		}
 
-		string code = new StreamReader( fs ).ReadToEnd();
-		// extra semicolon provided after file contents.. just in case
-		code = "var exports = {}; " + code + "; exports;";
-		return ctx.Execute<IronJS.CommonObject>( code );
-	}
-
-	// threadsafe enqueue function
-	public void queueWorkItem( object item ) {
-			Console.WriteLine( "queueWorkItem(): queuing item: " + ((Callback)item).name );
-			Console.WriteLine( "queueWorkItem(): acquiring lock: " + workItems );
-		Monitor.Enter( workItems );
-		try {
-			workItems.Enqueue( item );
-			Console.WriteLine( "queueWorkItem(): item queued" );
-			manualResetEvent.Set();
-			Console.WriteLine( "queueWorkItem(): queue set to runnable" );
-		}
-		finally {
-			Monitor.Exit( workItems );
-			Console.WriteLine( "queueWorkItem: released lock" );
-		}
-	}
-
-	private string readFile( string filename ) {
-		string fileContents;
-		StreamReader streamReader = new StreamReader( filename );
-		try {
-			fileContents = streamReader.ReadToEnd();
-			return fileContents;
-		}
-		finally {
-			streamReader.Close();
-		}
-	}
-
-	public void evalCommandlineArgument() {
-		string[] args = System.Environment.GetCommandLineArgs();
-		if( args.Length != 2 ) {
-			Console.WriteLine( "usage: node <file.js>" );
-			System.Environment.Exit(1);
-		}
-		// string script = readFile( args[1] );
-		ReadJsFile( args[1] );
-	}
-
-	public void runEventLoop() {
-		while( true ) {
-			Console.WriteLine( "event loop running" );
-			Callback callback = null;
-			
-			// TODO: can we improve locking method?
+		// threadsafe enqueue function
+		public void queueWorkItem( object item ) {
+			log.Trace( "queueWorkItem(): queuing item: " + ( ( Callback )item ).name );
+			log.Trace( "queueWorkItem(): acquiring lock: " + workItems );
 			Monitor.Enter( workItems );
 			try {
-				Console.WriteLine( "event loop: acquired lock" );
-				callback = ( Callback )workItems.Dequeue();
-				if( callback == null ) {
-					manualResetEvent.Reset();
-				}
-			}
-			catch( Exception e ) {
-				Console.WriteLine( e );
-				manualResetEvent.Reset();
+				workItems.Enqueue( item );
+				log.Trace( "queueWorkItem(): item queued" );
+				manualResetEvent.Set();
+				log.Trace( "queueWorkItem(): queue set to runnable" );
 			}
 			finally {
 				Monitor.Exit( workItems );
-				Console.WriteLine( "event loop: released lock" );
+				log.Trace( "queueWorkItem: released lock" );
 			}
-			
-			if( callback != null ) {
-				Console.WriteLine( "event loop: dispatching callback: " + callback.name );
-				Console.WriteLine( "event loop: dispatching callback: " + callback.callback );
-				Console.WriteLine( "event loop: dispatching args: " + callback.args );
-				// TODO: not sure what this callback delegate looks like yet
-				callback.callback.Invoke( callback.args );
+		}
+
+		private string readFile( string filename ) {
+			string fileContents;
+			StreamReader streamReader = new StreamReader( filename );
+			try {
+				fileContents = streamReader.ReadToEnd();
+				return fileContents;
 			}
-			Console.WriteLine( "event loop waiting" );
-			manualResetEvent.WaitOne();
-		} // while
+			finally {
+				streamReader.Close();
+			}
+		}
+
+		public void evalCommandlineArgument() {
+			string[] args = System.Environment.GetCommandLineArgs();
+			if( args.Length != 2 ) {
+				Console.WriteLine( "usage: node <file.js>" );
+				System.Environment.Exit( 1 );
+			}
+			// string script = readFile( args[1] );
+			commonjs.SetRequireStack( args[ 1 ] );
+			ReadJsFile( args[ 1 ] );
+		}
+
+		public void runEventLoop() {
+			while( this.Listeners > 0 ) {
+				log.Trace( "event loop running" );
+				Callback callback = null;
+
+				// TODO: can we improve locking method?
+				Monitor.Enter( workItems );
+				try {
+					log.Trace( "event loop: acquired lock" );
+					callback = ( Callback )workItems.Dequeue();
+					if( callback == null ) {
+						manualResetEvent.Reset();
+					}
+				}
+				catch( Exception e ) {
+					log.Trace( e );
+					manualResetEvent.Reset();
+				}
+				finally {
+					Monitor.Exit( workItems );
+					log.Trace( "event loop: released lock" );
+				}
+
+				if( callback != null ) {
+					log.Trace( "event loop: dispatching callback: " + callback.name );
+					log.Trace( "event loop: dispatching callback: " + callback.callback );
+					log.Trace( "event loop: dispatching args: " + callback.args );
+					// TODO: not sure what this callback delegate looks like yet
+					callback.callback.Invoke( callback.args );
+				}
+				log.Trace( "event loop waiting" );
+				manualResetEvent.WaitOne();
+			} // while
+		}
+
+		/**
+		 * This is badly named - really it sets up the 
+		 * global context and then executes the file given
+		 * on within that context.
+		 */
+		public void ReadJsFile( string in_filename ) {
+
+			commonjs.SetRequireStack( in_filename );
+
+			// string pathpart = Path.GetDirectoryName( in_filename );
+			// path = Directory.GetCurrentDirectory() + pathpart;
+			// log.Trace( "path of js file: " + path );
+
+			var emit =
+			Utils.createHostFunction<Action<IronJS.BoxedValue>>(
+				ctx.Environment, ( obj ) => {
+					Console.WriteLine( IronJS.TypeConverter.ToString( obj ) );
+				}
+			);
+			ctx.SetGlobal<IronJS.FunctionObject>( "puts", emit );
+
+			var require =
+			Utils.createHostFunction<Func<string, IronJS.CommonObject>>(
+				ctx.Environment, ( obj ) => {
+					return Require( obj );
+				}
+			);
+			ctx.SetGlobal<IronJS.FunctionObject>( "require", require );
+
+			// Forms the `net" namespace
+			ctx.SetGlobal<IronJS.CommonObject>( "net", netObj );
+
+			// Forms the `http" namespace
+			// TODO: re-add after httpserver.cs is converted to IJS 0.2
+			// ctx.SetGlobal<IronJS.CommonObject>( "http", httpObj );
+
+			ctx.ExecuteFile( in_filename );
+		}
+	} // class
+
+	// note that this encapsulates callbacks on the .net side. The dispatch queue
+	// is a Queue of these.
+	// We use IFunction for the js callbacks
+	public class Callback
+	{
+		public string name = "";
+		public VarDelegate callback;
+		public object[] args;
 	}
-	
-	public void ReadJsFile( string in_filename ) {
 
-		string pathpart = Path.GetDirectoryName( in_filename );
-		path = Directory.GetCurrentDirectory() + pathpart;
-		Console.WriteLine( "path of js file: " + path );
-
-		var emit =
-		Utils.createHostFunction<Action<IronJS.BoxedValue>>( 
-			ctx.Environment, ( obj ) => { 
-				Console.WriteLine(IronJS.TypeConverter.ToString(obj) ); 
-			} 
-		);
-		ctx.SetGlobal<IronJS.FunctionObject>( "puts", emit );
-		
-		var require =
-		Utils.createHostFunction<Func<string,IronJS.CommonObject>>( 
-			ctx.Environment, ( obj ) => { 
-				return Require( obj );
-			} 
-		);
-		ctx.SetGlobal<IronJS.FunctionObject>("require", require );
-
-		// Forms the `net" namespace
-		ctx.SetGlobal<IronJS.CommonObject>( "net", netObj );
-		
-		// Forms the `http" namespace
-		// TODO: re-add after httpserver.cs is converted to IJS 0.2
-		// ctx.SetGlobal<IronJS.CommonObject>( "http", httpObj );
-	
-		ctx.ExecuteFile( in_filename );
-	}
-} // class
-
-// note that this encapsulates callbacks on the .net side. The dispatch queue
-// is a Queue of these.
-// We use IFunction for the js callbacks
-public class Callback 
-{
-	public string name = "";
-	public VarDelegate callback;
-	public object[] args;
+	public delegate void VarDelegate( params object[] args );
 }
-
-public delegate void VarDelegate( params object[] args );
