@@ -8,7 +8,6 @@
 
 using System.Threading;
 using System.IO;
-using System.Text;
 using System.Collections;
 using System.Collections.Generic;
 using System;
@@ -21,40 +20,50 @@ namespace Node.Net
 	{
 		// temp hack global used to access event queue
 		// by other modules
-		public static Server instance;
+	   public static Server Instance
+	   {
+	      get { return instance;}
+	   }
+
+	   private static readonly Server instance;
 
 		// number of registered callbacks active
 		public int Listeners = 0;
 
 		// dispatch queue and signalling primitive for main event loop
-		private ManualResetEvent manualResetEvent = new ManualResetEvent( false );
-		private Queue workItems = new Queue();
+		private readonly ManualResetEvent manualResetEvent = new ManualResetEvent( false );
+		private readonly Queue workItems = new Queue();
 
 		// toplevel JS execution context used for all JS code
-		private static IronJS.Hosting.CSharp.Context ctx = new IronJS.Hosting.CSharp.Context();
+		private static readonly IronJS.Hosting.CSharp.Context ctx = new IronJS.Hosting.CSharp.Context();
 
-		private static Node.Net.net netObj = new Net.net( ctx.Environment );
+		private static readonly net netObj = new net( ctx.Environment );
 		// TODO: re-add after httpserver.cs is converted to IJS 0.2
 		// private static http httpObj = new http( ctx.Environment );
+
+      static Server()
+      {
+         instance = new Server();
+      }
 
 		public static void Main() {
 			// eval js file given as first commandline arg and 
 			// run the event loop - runEventLoop() always blocks, unlike node.js
 			// which returns if no more callbacks are registered
-			instance = new Server();
-			instance.evalCommandlineArgument();
-			instance.runEventLoop();
+			Instance.EvalCommandlineArgument();
+			Instance.RunEventLoop();
 		}
 
 		private static List<string> requireStack = new List<string>();
 
-		/**
-		 * implements require() for importing js files/namespaces
-		 * 
-		 * file - the literal expression passed to require() in js.
-		 * Might be abs or rel path + filename.
-		 */
-		public static IronJS.CommonObject Require( string file ) {
+      /// <summary>
+      /// Implements require() for importing js files/namespaces
+      /// </summary>
+      /// <param name="file">The literal expression passed to require() in js. Might be absolute or relative path + filename.</param>
+      /// <returns>
+      /// The contents of the <paramref name="file"/>.
+      /// </returns>
+		public static CommonObject Require( string file ) {
 			// TODO: could possibly break this by doing require('undefined');
 			if( String.IsNullOrWhiteSpace( file ) || String.IsNullOrEmpty( file ) || file == "undefined" ) {
 				throw new Exception( "invalid file spec passed to require()" );
@@ -71,23 +80,29 @@ namespace Node.Net
 			}
 		
 			// otherwise invoke CommonJS search rules
-			commonjs.SetRequireStack( file );
+			CommonJS.SetRequireStack( file );
 			string filename = Path.GetFileName( file );
 
-			FileStream fs;
-			string filepath = commonjs.FindFile( filename );
-			fs = new FileStream( filepath, FileMode.Open, FileAccess.Read );
-		
-			string code = new StreamReader( fs ).ReadToEnd();
-			// extra semicolon provided after file contents.. just in case
-			code = "var exports = {}; " + code + "; exports;";
-			IronJS.CommonObject retval = ctx.Execute<IronJS.CommonObject>( code );
-			commonjs.RequireStack.Pop();
-			return retval;
+			string filepath = CommonJS.FindFile( filename );
+
+         using (var fs = new FileStream(filepath, FileMode.Open, FileAccess.Read))
+         {
+            string code = new StreamReader(fs).ReadToEnd();
+            // extra semicolon provided after file contents.. just in case
+            code = "var exports = {}; " + code + "; exports;";
+            CommonObject retval = ctx.Execute<CommonObject>(code);
+            // This should probably be inside a finally so it's always executed? [asbjornu]
+            CommonJS.RequireStack.Pop();
+            return retval;
+         }
 		}
 
-		// threadsafe enqueue function
-		public void queueWorkItem( object item ) {
+
+      /// <summary>
+      /// Threadsafe enqueue function.
+      /// </summary>
+      /// <param name="item">The item.</param>
+		public void QueueWorkItem( object item ) {
 			log.Trace( "queueWorkItem(): queuing item: " + ( ( Callback )item ).name );
 			log.Trace( "queueWorkItem(): acquiring lock: " + workItems );
 			Monitor.Enter( workItems );
@@ -102,31 +117,19 @@ namespace Node.Net
 				log.Trace( "queueWorkItem: released lock" );
 			}
 		}
-
-		private string readFile( string filename ) {
-			string fileContents;
-			StreamReader streamReader = new StreamReader( filename );
-			try {
-				fileContents = streamReader.ReadToEnd();
-				return fileContents;
-			}
-			finally {
-				streamReader.Close();
-			}
-		}
-
-		public void evalCommandlineArgument() {
+      
+		public void EvalCommandlineArgument() {
 			string[] args = System.Environment.GetCommandLineArgs();
 			if( args.Length != 2 ) {
 				Console.WriteLine( "usage: node <file.js>" );
 				System.Environment.Exit( 1 );
 			}
 			// string script = readFile( args[1] );
-			commonjs.SetRequireStack( args[ 1 ] );
-			ReadJsFile( args[ 1 ] );
+			CommonJS.SetRequireStack( args[ 1 ] );
+			SetupContext( args[ 1 ] );
 		}
 
-		public void runEventLoop() {
+		public void RunEventLoop() {
 			while( this.Listeners > 0 ) {
 				log.Trace( "event loop running" );
 				Callback callback = null;
@@ -161,43 +164,33 @@ namespace Node.Net
 			} // while
 		}
 
-		/**
-		 * This is badly named - really it sets up the 
-		 * global context and then executes the file given
-		 * on within that context.
-		 */
-		public void ReadJsFile( string in_filename ) {
-
-			commonjs.SetRequireStack( in_filename );
+      /// <summary>
+      /// Sets up the global context and then executes the file given on within that context.
+      /// </summary>
+      /// <param name="filename">The name of the file to execute.</param>
+		public void SetupContext( string filename ) {
+			CommonJS.SetRequireStack( filename );
 
 			// string pathpart = Path.GetDirectoryName( in_filename );
 			// path = Directory.GetCurrentDirectory() + pathpart;
 			// log.Trace( "path of js file: " + path );
 
 			var emit =
-			Utils.createHostFunction<Action<IronJS.BoxedValue>>(
-				ctx.Environment, ( obj ) => {
-					Console.WriteLine( IronJS.TypeConverter.ToString( obj ) );
-				}
-			);
-			ctx.SetGlobal<IronJS.FunctionObject>( "puts", emit );
+			Utils.createHostFunction<Action<BoxedValue>>(
+				ctx.Environment, obj => Console.WriteLine( TypeConverter.ToString( obj ) ));
+			ctx.SetGlobal( "puts", emit );
 
-			var require =
-			Utils.createHostFunction<Func<string, IronJS.CommonObject>>(
-				ctx.Environment, ( obj ) => {
-					return Require( obj );
-				}
-			);
-			ctx.SetGlobal<IronJS.FunctionObject>( "require", require );
+			var require = Utils.createHostFunction<Func<string, CommonObject>>( ctx.Environment, Require );
+			ctx.SetGlobal( "require", require );
 
 			// Forms the `net" namespace
-			ctx.SetGlobal<IronJS.CommonObject>( "net", netObj );
+			ctx.SetGlobal<CommonObject>( "net", netObj );
 
 			// Forms the `http" namespace
 			// TODO: re-add after httpserver.cs is converted to IJS 0.2
 			// ctx.SetGlobal<IronJS.CommonObject>( "http", httpObj );
 
-			ctx.ExecuteFile( in_filename );
+			ctx.ExecuteFile( filename );
 		}
 	} // class
 

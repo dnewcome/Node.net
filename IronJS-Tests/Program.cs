@@ -11,8 +11,8 @@ namespace IronJS_FS_Tests
 	{
 		static void Main( string[] args ) {
 			Server instance = new Server();
-			instance.evalCommandlineArgument();
-			instance.runEventLoop();			
+			instance.EvalCommandlineArgument();
+			instance.RunEventLoop();			
 		}
 	}
 }

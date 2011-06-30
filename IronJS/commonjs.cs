@@ -1,14 +1,11 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 
 namespace Node.Net
 {
-	class commonjs
+	internal static class CommonJS
 	{
-		public static Stack<string> RequireStack = new Stack<string>();
+		public static readonly Stack<string> RequireStack = new Stack<string>();
 		
 		/**
 		 * Find a a given js file according to CommonJS search 

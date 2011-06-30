@@ -15,19 +15,19 @@ using IronJS.Native;
 */
 namespace Node.Net 
 {
-	public class NetStream : IronJS.CommonObject
+	public class NetStream : CommonObject
 	{
 		// XXX making stream public to work around incomplete design - fix this
 		public Stream stream;
 
 		// TODO: callbacks will be JS functions, should probably use 
 		// List<IFunction>
-		ArrayList dataCallbacks = new ArrayList();
-		ArrayList endCallbacks = new ArrayList();
+	   readonly ArrayList dataCallbacks = new ArrayList();
+	   readonly ArrayList endCallbacks = new ArrayList();
 		
 		// TODO: this should be defined somewhere else
 		// Using 1k buffer - experimentally, seems to be what node.js uses
-		int bufferSize = 1024; 
+	   const int bufferSize = 1024; 
 		
 		public NetStream( Stream stream, IronJS.Environment env ) : base( env, env.Maps.Base, env.Prototypes.Object ) {
 			this.stream = stream;
@@ -52,7 +52,7 @@ namespace Node.Net
 			
 			if( bytesRead > 0 ) {
 				// queue work before calling another read, could be out of order otw
-				Server.instance.queueWorkItem( new Callback() { name = "stream:raiseDataEvent", callback = raiseDataEvent, args = new object[] { chunk } } );
+				Server.Instance.QueueWorkItem( new Callback { name = "stream:raiseDataEvent", callback = raiseDataEvent, args = new object[] { chunk } } );
 				byte[] nextBuffer = new byte[ bufferSize ];
 				this.stream.BeginRead( nextBuffer, 0, bufferSize, ReadCallback, nextBuffer );
 			}
@@ -61,7 +61,7 @@ namespace Node.Net
 				// remote end of socket, not sure if raising "end" when there
 				// is no more data is the right thing to do. It does the right thing
 				// when using Telnet as the client 
-				Server.instance.queueWorkItem( new Callback() { name = "stream:raiseEndEvent", callback = raiseEndEvent, args = new object[]{} } );
+				Server.Instance.QueueWorkItem( new Callback { name = "stream:raiseEndEvent", callback = raiseEndEvent, args = new object[]{} } );
 			}
 		}
 
@@ -76,7 +76,7 @@ namespace Node.Net
 			this.stream.Close();
 		}
 		public void addListener( string eventname, IronJS.FunctionObject callback ) {
-			Server.instance.Listeners++;
+			Server.Instance.Listeners++;
 			log.Trace( "NetStream: adding listener: " + eventname );
 			if( eventname == "data" ) {
 				dataCallbacks.Add( callback );
@@ -87,11 +87,11 @@ namespace Node.Net
 		}
 		public void removeAllListeners( string eventname ) {
 			if( eventname == "data" ) {
-				Server.instance.Listeners -= dataCallbacks.Count;
+				Server.Instance.Listeners -= dataCallbacks.Count;
 				dataCallbacks.Clear();
 			}
 			else if( eventname == "end" ) {
-				Server.instance.Listeners -= endCallbacks.Count;
+				Server.Instance.Listeners -= endCallbacks.Count;
 				endCallbacks.Clear();
 			}
 		}
@@ -129,13 +129,13 @@ namespace Node.Net
 		
 	} // class
 
-	public class NetServer : IronJS.CommonObject
+	public class NetServer : CommonObject
 	{
 		TcpListener tcpServer;
 
-		ArrayList listeningCallbacks = new ArrayList();
-		ArrayList connectionCallbacks = new ArrayList();
-		ArrayList closeCallbacks = new ArrayList();
+	   readonly ArrayList listeningCallbacks = new ArrayList();
+	   readonly ArrayList connectionCallbacks = new ArrayList();
+	   readonly ArrayList closeCallbacks = new ArrayList();
 
 		public NetServer( IronJS.FunctionObject callback, IronJS.Environment env ) : base( env, env.Maps.Base, env.Prototypes.Object ) {
 			// have to set this stuff up. not sure why yet
@@ -162,7 +162,7 @@ namespace Node.Net
 			this.tcpServer = new TcpListener( ipAddress, port );
 			log.Trace( "net.Server.listen(): starting tcp server" );
 			this.tcpServer.Start();
-			Server.instance.queueWorkItem( new Callback { callback = raiseListeningEvent, args = new object[]{} } );
+			Server.Instance.QueueWorkItem( new Callback { callback = raiseListeningEvent, args = new object[]{} } );
 			this.tcpServer.BeginAcceptTcpClient( listenerCallback, null );
 			return this;
 		}
@@ -175,7 +175,7 @@ namespace Node.Net
 			
 			TcpClient client = this.tcpServer.EndAcceptTcpClient( result );
 			NetStream stream = new NetStream( client.GetStream(), Env );
-			Server.instance.queueWorkItem( new Callback { callback = raiseConnectionEvent, args = new object[]{ stream } } );
+			Server.Instance.QueueWorkItem( new Callback { callback = raiseConnectionEvent, args = new object[]{ stream } } );
 			
 			// kick off async read
 			stream.read();
@@ -209,28 +209,28 @@ namespace Node.Net
 					func.Compiler.compileAs<Action<IronJS.FunctionObject,IronJS.CommonObject,IronJS.CommonObject>>(func);
 				fun.Invoke(func, this, stream );
 				*/
-				func.Call<NetStream>( this, stream );
+				func.Call( this, stream );
 			}
 		}
 
 		public void removeAllListeners( string eventname ) {
 			if( eventname == "listening" ) {
-				Server.instance.Listeners -= listeningCallbacks.Count;
+				Server.Instance.Listeners -= listeningCallbacks.Count;
 				listeningCallbacks.Clear();
 			}
 			else if( eventname == "connection" ) {
-				Server.instance.Listeners -= connectionCallbacks.Count;
+				Server.Instance.Listeners -= connectionCallbacks.Count;
 				connectionCallbacks.Clear();
 			}
 			else if( eventname == "close" ) {
-				Server.instance.Listeners -= closeCallbacks.Count;
+				Server.Instance.Listeners -= closeCallbacks.Count;
 				closeCallbacks.Clear();
 			}
 		}
 
 		public void addListener( string eventname, IronJS.FunctionObject callback) {
 			log.Trace( "NetServer - adding listener: " + eventname );
-			Server.instance.Listeners++;
+			Server.Instance.Listeners++;
 			if( eventname == "listening" ) {
 				listeningCallbacks.Add( callback );
 			}
@@ -248,19 +248,19 @@ namespace Node.Net
 
 	// provides the 'net' namespace
 	// TODO: rename this class 
-	public class net : IronJS.CommonObject
+	public class net : CommonObject
 	{
 		public net( IronJS.Environment env )
 			: base( env, env.Maps.Base, env.Prototypes.Object ) {
 
-			var objMethod = Utils.createHostFunction<Func<IronJS.FunctionObject, IronJS.CommonObject>>( Env, CreateServer );
+			var objMethod = Utils.createHostFunction<Func<FunctionObject, CommonObject>>( Env, CreateServer );
 			log.Trace( objMethod );
 			this.Put( "createServer", objMethod );
 		}
 
-		public IronJS.CommonObject CreateServer( IronJS.FunctionObject callback ) {
+		public CommonObject CreateServer( FunctionObject callback ) {
 			log.Trace( "net.createServer() called." );
-			Net.NetServer server = new Net.NetServer( callback, Env );
+			NetServer server = new Net.NetServer( callback, Env );
 			log.Trace( server );
 			return ( server );
 		}
