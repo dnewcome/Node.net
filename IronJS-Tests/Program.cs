@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
+using Node.Net;
+
 namespace IronJS_FS_Tests
 {
 	class Program
