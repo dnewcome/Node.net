@@ -11,16 +11,14 @@ using IronJS.Native;
 // using IronJS.Native.Utils;
 
 /**
-* Net package implements the `net" module in the Node.js API, currently
-*	Stream and Server - using the .NET equivalents Stream and TcpListener
+* NetServer implements net.Server in the Node.js API using 
+* the .NET equivalent of TcpListener
 */
 namespace Node.Net 
 {
-
 	public class NetServer : EventEmitter
 	{
 		TcpListener tcpServer;
-
 		
 		public NetServer( IronJS.FunctionObject callback, IronJS.Environment env ) : base( env ) {
 
@@ -72,31 +70,11 @@ namespace Node.Net
 			NetStream stream = ( NetStream )args[0];
 			log.Trace( "http.server.raiseConnectionEvent() - calling " + Callbacks["connect"].Count + " callbacks" );
 			emit( "connect", new BoxedValue[] { IronJS.TypeConverter.ToBoxedValue( stream ) } );
-			/*
-			foreach( object callback in Callbacks["connect"] ) {
-				log.Trace( "calling js function callback" );
-				IronJS.FunctionObject func = ( IronJS.FunctionObject )callback;
-				func.Call<NetStream>( this, stream );
-			}
-			*/
 		}
 
 		public void addListener( string eventname, IronJS.FunctionObject callback) {
 			log.Trace( "NetServer - adding listener: " + eventname );
 			on( eventname, callback );
-			/*
-			Server.instance.Listeners++;
-			// TODO: listen is not an event .. remove this
-			if( eventname == "connect" ) {
-				Callbacks["connect"].Add( callback );
-			}
-			else if( eventname == "close" ) {
-				Callbacks["close"].Add( callback );
-			}
-			else {
-				throw new Exception( "addListener called for unsupported event" );
-			}
-			*/
 		}
 	} // class
 
