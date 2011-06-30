@@ -52,7 +52,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="log.cs" />
     <Compile Include="netserver.cs" />
+    <Compile Include="commonjs.cs" />
     <Compile Include="server.cs" />
   </ItemGroup>
   <ItemGroup>
