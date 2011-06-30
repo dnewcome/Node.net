@@ -7,6 +7,10 @@ using IronJS.Native;
 
 namespace Node.Net
 {
+	/**
+	* NetStream implements the Node.js net.Socket (formerly net.Stream)
+	*	Used by net.Server and http.Server
+	*/
 	public class NetStream : IronJS.CommonObject
 	{
 		private Stream stream;
@@ -16,8 +20,6 @@ namespace Node.Net
 		ArrayList dataCallbacks = new ArrayList();
 		ArrayList endCallbacks = new ArrayList();
 
-		// TODO: this should be defined somewhere else
-		// Using 1k buffer - experimentally, seems to be what node.js uses
 		int bufferSize = Config.BufferSize;
 
 		public NetStream( Stream stream, IronJS.Environment env )
