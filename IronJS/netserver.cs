@@ -26,7 +26,6 @@ namespace Node.Net
 
 			// TODO: move as much of this as possible to EventEmitter
 			Callbacks = new Dictionary<string, ArrayList>() { 
-				// { "listen", new ArrayList() },
 				{ "connect", new ArrayList() },
 				{ "close", new ArrayList() }
 			};
@@ -51,8 +50,6 @@ namespace Node.Net
 			log.Trace( "net.Server.listen(): starting tcp server" );
 			this.tcpServer.Start();
 			
-			// TODO: 'listening' is not an event. Slated for removal.
-			// Server.instance.queueWorkItem( new Callback { callback = raiseListeningEvent, args = new object[]{} } );
 			this.tcpServer.BeginAcceptTcpClient( listenerCallback, null );
 			return this;
 		}
@@ -71,20 +68,6 @@ namespace Node.Net
 			stream.read();
 		}
 		
-		// TODO: pull this stuff out to an event class
-
-		// TODO: 'listen/listening' is not an event. Not sure why this is in here
-		// slated for removal.
-		/*
-		public void raiseListeningEvent( object[] args ) {
-			log.Trace( "http.server.raiseListeningEvent()" );
-			for( var i=0; i < Callbacks["listen"].Count; i++ ) {
-				IronJS.FunctionObject func = ( IronJS.FunctionObject )Callbacks["listen"][i];
-				func.Call( this );
-			}
-		}
-		*/
-
 		public void raiseConnectionEvent( object[] args ) {
 			NetStream stream = ( NetStream )args[0];
 			log.Trace( "http.server.raiseConnectionEvent() - calling " + Callbacks["connect"].Count + " callbacks" );
@@ -104,10 +87,7 @@ namespace Node.Net
 			/*
 			Server.instance.Listeners++;
 			// TODO: listen is not an event .. remove this
-			if( eventname == "listen" ) {
-				Callbacks["listen"].Add( callback );
-			}
-			else if( eventname == "connect" ) {
+			if( eventname == "connect" ) {
 				Callbacks["connect"].Add( callback );
 			}
 			else if( eventname == "close" ) {
