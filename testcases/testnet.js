@@ -4,6 +4,6 @@ var server = net.createServer( function( stream ) {
 	stream.addListener( 'data', function( data ) {
 		puts( data );
 		stream.removeAllListeners( 'data' );
-		server.removeAllListeners( 'connection' );
+		server.removeAllListeners( 'connect' );
 	});
 }).listen( 9982, 'localhost' );

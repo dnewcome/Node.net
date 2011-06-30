@@ -88,26 +88,20 @@ namespace Node.Net
 		public void raiseConnectionEvent( object[] args ) {
 			NetStream stream = ( NetStream )args[0];
 			log.Trace( "http.server.raiseConnectionEvent() - calling " + Callbacks["connect"].Count + " callbacks" );
-
+			emit( "connect", new BoxedValue[] { IronJS.TypeConverter.ToBoxedValue( stream ) } );
+			/*
 			foreach( object callback in Callbacks["connect"] ) {
 				log.Trace( "calling js function callback" );
 				IronJS.FunctionObject func = ( IronJS.FunctionObject )callback;
 				func.Call<NetStream>( this, stream );
 			}
-		}
-
-		public void removeAllListeners( string eventname ) {
-			if( Callbacks.ContainsKey( eventname ) ) {
-				Server.instance.Listeners -= Callbacks[ eventname ].Count;
-				Callbacks[ eventname ].Clear();
-			}
-			else {
-				throw new Exception( "tried to remove invalid event handlers: " + eventname );
-			}
+			*/
 		}
 
 		public void addListener( string eventname, IronJS.FunctionObject callback) {
 			log.Trace( "NetServer - adding listener: " + eventname );
+			on( eventname, callback );
+			/*
 			Server.instance.Listeners++;
 			// TODO: listen is not an event .. remove this
 			if( eventname == "listen" ) {
@@ -122,6 +116,7 @@ namespace Node.Net
 			else {
 				throw new Exception( "addListener called for unsupported event" );
 			}
+			*/
 		}
 	} // class
 
