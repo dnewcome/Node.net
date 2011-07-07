@@ -42,7 +42,7 @@ namespace Node.Net
 			// run the event loop - runEventLoop() always blocks, unlike node.js
 			// which returns if no more callbacks are registered
 			instance = new Server();
-			instance.evalCommandlineArgument();
+			instance.evalCommandlineArgument( null );
 			instance.runEventLoop();
 		}
 
@@ -115,10 +115,10 @@ namespace Node.Net
 			}
 		}
 
-		public void evalCommandlineArgument() {
-			string[] args = System.Environment.GetCommandLineArgs();
+		public void evalCommandlineArgument( string[] in_args ) {
+			string[] args = in_args ?? System.Environment.GetCommandLineArgs();
 			if( args.Length != 2 ) {
-				Console.WriteLine( "usage: node <file.js>" );
+				log.StdOut( "usage: node <file.js>" );
 				System.Environment.Exit( 1 );
 			}
 			// string script = readFile( args[1] );
@@ -159,6 +159,10 @@ namespace Node.Net
 				log.Trace( "event loop waiting" );
 				manualResetEvent.WaitOne();
 			} // while
+			
+			// if we are not running in our own process, just exiting the event loop
+			// isn't enough to close listening servers.
+			NetServer.Cleanup();
 		}
 
 		/**
@@ -177,7 +181,7 @@ namespace Node.Net
 			var emit =
 			Utils.createHostFunction<Action<IronJS.BoxedValue>>(
 				ctx.Environment, ( obj ) => {
-					Console.WriteLine( IronJS.TypeConverter.ToString( obj ) );
+					log.StdOut( IronJS.TypeConverter.ToString( obj ) );
 				}
 			);
 			ctx.SetGlobal<IronJS.FunctionObject>( "puts", emit );

@@ -18,10 +18,13 @@ namespace Node.Net
 {
 	public class NetServer : EventEmitter
 	{
-		TcpListener tcpServer;
-		
-		public NetServer( IronJS.FunctionObject callback, IronJS.Environment env ) : base( env ) {
+		public TcpListener tcpServer;
 
+		// track servers for cleanup later
+		static List<NetServer> netservers = new List<NetServer>();
+
+		public NetServer( IronJS.FunctionObject callback, IronJS.Environment env ) : base( env ) {
+			netservers.Add( this );
 			// TODO: move as much of this as possible to EventEmitter
 			Callbacks = new Dictionary<string, ArrayList>() { 
 				{ "connect", new ArrayList() },
@@ -38,7 +41,14 @@ namespace Node.Net
 			this.Put( "removeAllListeners", removeAllListenersMethod, TypeTags.Function );
 			this.addListener( "connect", callback );
 		}
-		
+
+		public static void Cleanup() { 
+			foreach( NetServer server in netservers ) {
+				server.tcpServer.Stop();
+				server.tcpServer.Server.Dispose();
+			}
+		}
+
 		// in Node.js, listen is async, here it blocks on call to Start()
 		public CommonObject listen( object in_port, string host ) {
 			int port = Convert.ToInt32( in_port );
